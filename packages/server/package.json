@@ -1,0 +1,27 @@
+{
+  "name": "@mbler/mcx-server",
+  "version": "1.0.0",
+  "description": "MCX Language Server",
+  "license": "MIT",
+  "author": {
+    "email": "root@ruanhor.dpdns.org",
+    "name": "ruanhor",
+    "url": "https://github.com/RuanhoR"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "test": "pnpm build && cd test && pnpm test"
+  }
+}
