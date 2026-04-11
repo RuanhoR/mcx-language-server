@@ -14,13 +14,17 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "*"
+    "onStartupFinished"
   ],
+  "repository": {
+    "url": "https://github.com/RuanhoR/mcx-language-server"
+  },
   "main": "dist/extension.js",
   "types": "dist/extension.d.ts",
   "files": [
     "dist",
     "syntaxes",
+    "LICENSE",
     "language-configuration.json",
     "README.md"
   ],

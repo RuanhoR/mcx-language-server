@@ -1,6 +1,6 @@
 {
   "name": "@mbler/mcx-server",
-  "version": "1.0.0",
+  "version": "0.1.1-alpha.r20260411.1",
   "description": "MCX Language Server",
   "license": "MIT",
   "author": {
@@ -13,12 +13,17 @@
   "types": "dist/index.d.ts",
   "files": [
     "dist",
+    "bin",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js"
     }
   },
   "scripts": {

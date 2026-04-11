@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@mbler/mcx-core": "0.0.5",
-    "@volar/language-core": "^2.4.28"
+    "@volar/language-core": "^2.4.28",
+    "vscode-uri": "^3.1.0"
   }
 }
