@@ -1,0 +1,66 @@
+{
+  "comments": {
+    "blockComment": ["<!--", "-->"]
+  },
+  "brackets": [
+    ["<", ">"],
+    ["{", "}"],
+    ["(", ")"],
+    ["[", "]"]
+  ],
+  "autoClosingPairs": [
+    {
+      "open": "<",
+      "close": ">"
+    },
+    {
+      "open": "\"",
+      "close": "\""
+    },
+    {
+      "open": "'",
+      "close": "'"
+    },
+    {
+      "open": "{",
+      "close": "}"
+    },
+    {
+      "open": "(",
+      "close": ")"
+    },
+    {
+      "open": "[",
+      "close": "]"
+    }
+  ],
+  "surroundingPairs": [
+    ["\"", "\""],
+    ["'", "'"],
+    ["{", "}"],
+    ["(", ")"],
+    ["[", "]"],
+    ["<", ">"]
+  ],
+  "onEnterRules": [
+    {
+      "beforeText": "^\\s*<([A-Za-z][\\w:-]*)(?:\\s+[^>]*)?>[^<]*$",
+      "afterText": "^\\s*</([A-Za-z][\\w:-]*)>\\s*$",
+      "action": {
+        "indentAction": "IndentOutdent"
+      }
+    },
+    {
+      "beforeText": "^\\s*<([A-Za-z][\\w:-]*)(?:\\s+[^>]*)?>\\s*$",
+      "action": {
+        "indentAction": "Indent"
+      }
+    }
+  ],
+  "folding": {
+    "markers": {
+      "start": "^\\s*<([A-Za-z][\\w:-]*)(?:\\s+[^>]*)?>\\s*$",
+      "end": "^\\s*</([A-Za-z][\\w:-]*)>\\s*$"
+    }
+  }
+}

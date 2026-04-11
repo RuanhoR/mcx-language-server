@@ -10,18 +10,29 @@
   },
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
     "dist",
     "README.md"
   ],
   "exports": {
     ".": {
-      "import": "./dist/index.esm.js",
-      "require": "./dist/index.js",
+      "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
   },
   "scripts": {
+    "build": "rollup -c",
     "test": "pnpm build && cd test && pnpm test"
+  },
+  "dependencies": {
+    "@mbler/mcx-core": "^0.0.5",
+    "@volar/language-core": "^2.4.28",
+    "@volar/language-server": "^2.4.28",
+    "typescript": "^6.0.2",
+    "vscode-languageserver": "^9.0.1"
+  },
+  "bin": {
+    "mcx-language-server": "./bin/mcx-server.js"
   }
 }

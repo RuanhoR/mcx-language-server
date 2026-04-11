@@ -2,19 +2,40 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch Extension",
+      "name": "Launch Extension (Repo Root)",
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
       "args": [
+        "--disable-extensions",
         "--disable-updates",
         "--disable-workspace-trust",
         "--profile-temp",
         "--skip-release-notes",
         "--skip-welcome",
-        "--extensionDevelopmentPath=${workspaceFolder}/packages/client"
+        "--log=trace",
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/client",
+        "${workspaceFolder}"
       ],
-      "outFiles": ["${workspaceFolder}/packages/client/dist/*.js"]
+      "outFiles": ["${workspaceFolder}/packages/client/dist/**/*.js"]
+    },
+    {
+      "name": "Launch Extension (Client Folder Workspace)",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--disable-extensions",
+        "--disable-updates",
+        "--disable-workspace-trust",
+        "--profile-temp",
+        "--skip-release-notes",
+        "--skip-welcome",
+        "--log=trace",
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "${workspaceFolder}"
+      ],
+      "outFiles": ["${workspaceFolder}/dist/*.js"]
     }
   ]
 }

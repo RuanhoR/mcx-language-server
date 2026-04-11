@@ -1,0 +1,246 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "MCX",
+  "scopeName": "text.mcx",
+  "patterns": [
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#script-ts"
+    },
+    {
+      "include": "#script-js"
+    },
+    {
+      "include": "#script-default"
+    },
+    {
+      "include": "#tag-close"
+    },
+    {
+      "include": "#tag-open"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        {
+          "name": "comment.block.mcx",
+          "begin": "<!--",
+          "end": "-->"
+        }
+      ]
+    },
+    "script-ts": {
+      "name": "meta.tag.script.mcx",
+      "begin": "(<)(script)\\b(?=[^>]*\\b[Ll][Aa][Nn][Gg]\\s*=\\s*(?:\"(?:[Tt][Ss]|[Tt][Yy][Pp][Ee][Ss][Cc][Rr][Ii][Pp][Tt])\"|'(?:[Tt][Ss]|[Tt][Yy][Pp][Ee][Ss][Cc][Rr][Ii][Pp][Tt])'|(?:[Tt][Ss]|[Tt][Yy][Pp][Ee][Ss][Cc][Rr][Ii][Pp][Tt])))[^>]*(>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.mcx"
+        },
+        "2": {
+          "name": "entity.name.tag.script.mcx"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.end.mcx"
+        }
+      },
+      "end": "(</)(script)(\\s*>)",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.mcx"
+        },
+        "2": {
+          "name": "entity.name.tag.script.mcx"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.end.mcx"
+        }
+      },
+      "contentName": "meta.embedded.block.script.ts.mcx",
+      "patterns": [
+        {
+          "include": "source.ts"
+        }
+      ]
+    },
+    "script-js": {
+      "name": "meta.tag.script.mcx",
+      "begin": "(<)(script)\\b(?=[^>]*\\b[Ll][Aa][Nn][Gg]\\s*=\\s*(?:\"(?:[Jj][Ss]|[Jj][Aa][Vv][Aa][Ss][Cc][Rr][Ii][Pp][Tt])\"|'(?:[Jj][Ss]|[Jj][Aa][Vv][Aa][Ss][Cc][Rr][Ii][Pp][Tt])'|(?:[Jj][Ss]|[Jj][Aa][Vv][Aa][Ss][Cc][Rr][Ii][Pp][Tt])))[^>]*(>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.mcx"
+        },
+        "2": {
+          "name": "entity.name.tag.script.mcx"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.end.mcx"
+        }
+      },
+      "end": "(</)(script)(\\s*>)",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.mcx"
+        },
+        "2": {
+          "name": "entity.name.tag.script.mcx"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.end.mcx"
+        }
+      },
+      "contentName": "meta.embedded.block.script.js.mcx",
+      "patterns": [
+        {
+          "include": "source.js"
+        }
+      ]
+    },
+    "script-default": {
+      "name": "meta.tag.script.mcx",
+      "begin": "(<)(script)\\b(?![^>]*\\b[Ll][Aa][Nn][Gg]\\b)[^>]*(>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.mcx"
+        },
+        "2": {
+          "name": "entity.name.tag.script.mcx"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.end.mcx"
+        }
+      },
+      "end": "(</)(script)(\\s*>)",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.mcx"
+        },
+        "2": {
+          "name": "entity.name.tag.script.mcx"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.end.mcx"
+        }
+      },
+      "contentName": "meta.embedded.block.script.js.mcx",
+      "patterns": [
+        {
+          "include": "source.js"
+        }
+      ]
+    },
+    "tag-close": {
+      "patterns": [
+        {
+          "name": "meta.tag.mcx",
+          "match": "(</)([A-Za-z][\\w:-]*)(\\s*>)",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.tag.begin.mcx"
+            },
+            "2": {
+              "name": "entity.name.tag.mcx"
+            },
+            "3": {
+              "name": "punctuation.definition.tag.end.mcx"
+            }
+          }
+        }
+      ]
+    },
+    "tag-open": {
+      "name": "meta.tag.mcx",
+      "begin": "(<)([A-Za-z][\\w:-]*)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.mcx"
+        },
+        "2": {
+          "name": "entity.name.tag.mcx"
+        }
+      },
+      "end": "(/?>)",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.end.mcx"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#attribute"
+        },
+        {
+          "include": "#comment"
+        }
+      ]
+    },
+    "attribute": {
+      "patterns": [
+        {
+          "name": "meta.attribute.lang.mcx",
+          "match": "(\\blang\\b)(\\s*=\\s*)(\"|')((?:ts|typescript|js|javascript))(\\3)",
+          "captures": {
+            "1": {
+              "name": "entity.other.attribute-name.mcx"
+            },
+            "2": {
+              "name": "keyword.operator.assignment.mcx"
+            },
+            "3": {
+              "name": "punctuation.definition.string.begin.mcx"
+            },
+            "4": {
+              "name": "constant.language.mcx"
+            },
+            "5": {
+              "name": "punctuation.definition.string.end.mcx"
+            }
+          }
+        },
+        {
+          "name": "meta.attribute.lang.mcx",
+          "match": "(\\blang\\b)(\\s*=\\s*)((?:ts|typescript|js|javascript))\\b",
+          "captures": {
+            "1": {
+              "name": "entity.other.attribute-name.mcx"
+            },
+            "2": {
+              "name": "keyword.operator.assignment.mcx"
+            },
+            "3": {
+              "name": "constant.language.mcx"
+            }
+          }
+        },
+        {
+          "name": "entity.other.attribute-name.mcx",
+          "match": "\\b[@:]?[A-Za-z_][-A-Za-z0-9_:.@]*\\b(?=\\s*=)"
+        },
+        {
+          "name": "keyword.operator.assignment.mcx",
+          "match": "="
+        },
+        {
+          "name": "string.quoted.double.mcx",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.mcx",
+          "begin": "'",
+          "end": "'"
+        },
+        {
+          "name": "constant.language.boolean.mcx",
+          "match": "\\b(?:true|false)\\b"
+        },
+        {
+          "name": "constant.numeric.mcx",
+          "match": "\\b(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?\\b"
+        }
+      ]
+    }
+  }
+}
