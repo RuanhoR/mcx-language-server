@@ -215,6 +215,78 @@
           }
         },
         {
+          "name": "meta.attribute.event.mcx",
+          "match": "(on[A-Z]\\w*)(\\s*=\\s*)(\"|')([^\"']*)(\\3)",
+          "captures": {
+            "1": {
+              "name": "support.function.event-handler.mcx"
+            },
+            "2": {
+              "name": "keyword.operator.assignment.mcx"
+            },
+            "3": {
+              "name": "punctuation.definition.string.begin.mcx"
+            },
+            "4": {
+              "name": "string.quoted.double.mcx"
+            },
+            "5": {
+              "name": "punctuation.definition.string.end.mcx"
+            }
+          }
+        },
+        {
+          "name": "meta.attribute.dynamic.mcx",
+          "match": "(\\$\\w+)",
+          "captures": {
+            "1": {
+              "name": "variable.other.dynamic.mcx"
+            }
+          }
+        },
+        {
+          "name": "meta.attribute.css-class.mcx",
+          "match": "(class)(\\s*=\\s*)(\"|')([^\"']*)(\\3)",
+          "captures": {
+            "1": {
+              "name": "entity.other.attribute-name.class.mcx"
+            },
+            "2": {
+              "name": "keyword.operator.assignment.mcx"
+            },
+            "3": {
+              "name": "punctuation.definition.string.begin.mcx"
+            },
+            "4": {
+              "name": "string.quoted.double.mcx"
+            },
+            "5": {
+              "name": "punctuation.definition.string.end.mcx"
+            }
+          }
+        },
+        {
+          "name": "meta.attribute.id.mcx",
+          "match": "(id)(\\s*=\\s*)(\"|')([^\"']*)(\\3)",
+          "captures": {
+            "1": {
+              "name": "entity.other.attribute-name.id.mcx"
+            },
+            "2": {
+              "name": "keyword.operator.assignment.mcx"
+            },
+            "3": {
+              "name": "punctuation.definition.string.begin.mcx"
+            },
+            "4": {
+              "name": "string.quoted.double.mcx"
+            },
+            "5": {
+              "name": "punctuation.definition.string.end.mcx"
+            }
+          }
+        },
+        {
           "name": "entity.other.attribute-name.mcx",
           "match": "\\b[@:]?[A-Za-z_][-A-Za-z0-9_:.@]*\\b(?=\\s*=)"
         },
@@ -239,6 +311,43 @@
         {
           "name": "constant.numeric.mcx",
           "match": "\\b(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?\\b"
+        },
+        {
+          "name": "variable.interpolation.mcx",
+          "match": "\\{\\{[^}]*\\}\\}"
+        },
+        {
+          "name": "meta.attribute.boolean.mcx",
+          "match": "\\b([A-Za-z_][\\w-]*)\\b(?!(?:=\"[^\"]*\"|='[^']*'))",
+          "captures": {
+            "1": {
+              "name": "constant.language.boolean.mcx"
+            }
+          }
+        },
+        {
+          "name": "meta.attribute.variable.mcx",
+          "match": "(\\{\\{)([^}]*)(\\}\\})",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.interpolation.begin.mcx"
+            },
+            "2": {
+              "name": "variable.other.interpolation.mcx"
+            },
+            "3": {
+              "name": "punctuation.definition.interpolation.end.mcx"
+            }
+          }
+        },
+        {
+          "name": "meta.attribute.src-href.mcx",
+          "match": "\\b(?:src|href)\\b",
+          "captures": {
+            "1": {
+              "name": "entity.other.attribute-name.url.mcx"
+            }
+          }
         }
       ]
     }
