@@ -1,9 +1,9 @@
 {
   "name": "mcx-vscode-client",
   "version": "1.0.0",
-  "displayName": "MCX Language Support",
+  "displayName": "MCX Language Support for vscode(cli by mbler)",
   "description": "MCX VSCode Client",
-  "publisher": "mbler",
+  "publisher": "ruanhor",
   "license": "MIT",
   "author": "ruanhor",
   "packageManager": "pnpm@10.30.3",
@@ -21,15 +21,9 @@
   },
   "main": "dist/extension.js",
   "types": "dist/extension.d.ts",
-  "files": [
-    "dist",
-    "syntaxes",
-    "LICENSE",
-    "language-configuration.json",
-    "README.md"
-  ],
   "scripts": {
     "build": "rollup -c",
+    "vscode-build": "node scripts/vscode-build.js",
     "vscode:prepublish": "pnpm build",
     "test": "pnpm build && cd test && pnpm test"
   },
