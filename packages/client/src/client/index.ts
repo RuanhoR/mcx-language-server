@@ -5,6 +5,7 @@ import {
   type LanguageClientOptions,
   type ServerOptions,
 } from "vscode-languageclient/node.js";
+import { middleware as volarMiddleware } from "@volar/vscode";
 
 /**
  * Build a VSCode language client for MCX files.
@@ -38,6 +39,7 @@ export function createMCXLanguageClient(context: ExtensionContext): LanguageClie
       { language: "mcx" },
       { pattern: "**/*.mcx" },
     ],
+    middleware: volarMiddleware,
     synchronize: {
       fileEvents: workspace.createFileSystemWatcher("**/*.mcx"),
     },

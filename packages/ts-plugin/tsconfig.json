@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "es2015",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": true,
+    "strict": true,
+    "verbatimModuleSyntax": false,
+    "skipLibCheck": true,
+    "allowJs": true
+  },
+  "include": ["src/**/*.ts"]
+}

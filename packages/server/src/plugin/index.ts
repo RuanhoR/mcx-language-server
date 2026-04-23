@@ -53,7 +53,7 @@ export function createMCXLanguagePlugin(tsModule: typeof import("typescript")): 
         {
           extension: "mcx",
           isMixedContent: true,
-          scriptKind: tsModule.ScriptKind.JS,
+          scriptKind: tsModule.ScriptKind.Deferred,
         },
       ],
       getServiceScript(virtualCode: VirtualCode): TypeScriptServiceScript | undefined {

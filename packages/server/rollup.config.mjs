@@ -45,11 +45,19 @@ const external = [
 export default [
   {
     input: './src/index.ts',
-    output: {
-      file: './dist/index.js',
-      format: 'esm',
-      sourcemap: true,
-    },
+    output: [
+      {
+        file: './dist/index.js',
+        format: 'esm',
+        sourcemap: true,
+      },
+      {
+        file: './dist/index.cjs',
+        format: 'cjs',
+        sourcemap: true,
+        exports: 'named',
+      },
+    ],
     external,
     plugins: sharedPlugins,
   },

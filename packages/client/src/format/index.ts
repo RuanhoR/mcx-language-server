@@ -155,7 +155,7 @@ function normalizeMultilineText(input: string): string {
   const minIndent = meaningful.reduce((min, line) => {
     const leading = line.match(/^\s*/)?.[0].length ?? 0;
     return Math.min(min, leading);
-  }, Number.MAX_SAFE_INTEGER);
+  }, Infinity);
 
   return lines.map((line) => line.slice(minIndent)).join("\n");
 }

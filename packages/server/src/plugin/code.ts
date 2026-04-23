@@ -42,6 +42,8 @@ const DISABLED_FEATURES: NonNullable<CodeMapping["data"]> = {
   format: false,
 };
 
+type MCXRuntimeType = "app" | "event" | "ui" | "component";
+
 class StringSnapshot implements IScriptSnapshot {
   constructor(private readonly text: string) {}
 
@@ -168,8 +170,9 @@ export class MCXVirtualCode implements VirtualCode {
     const scriptLang = (scriptTag.arr?.lang ?? "").toString().toLowerCase();
     const isTypeScript = scriptLang === "ts" || scriptLang === "typescript";
 
-    const analysisSection = this.buildMetadataSection(tags);
-    const generated = scriptSource + analysisSection;
+    const metadataSection = this.buildMetadataSection(tags);
+    const runtimeSection = this.buildRuntimeModelSection(source);
+    const generated = scriptSource + metadataSection + runtimeSection;
 
     const mappings: CodeMapping[] = [];
     if (scriptSource.length > 0) {
@@ -213,6 +216,89 @@ export class MCXVirtualCode implements VirtualCode {
     ]);
   }
 
+  private buildRuntimeModelSection(source: string): string {
+    try {
+      const compileData = (mcx as any).compiler.compileMCXFn(source);
+      const runtimeType = this.resolveRuntimeType(compileData);
+      const hasScriptDefaultExport = this.hasScriptDefaultExport(compileData?.JSIR?.BuildCache?.export ?? []);
+
+      const lines: string[] = [
+        "",
+        "/* MCX runtime compatibility for TypeScript service */",
+        `type __MCX_runtime_type = ${JSON.stringify(runtimeType)};`,
+        "type __MCX_runtime_export = {",
+        "  type: __MCX_runtime_type;",
+        runtimeType === "component"
+          ? "  setup: null;"
+          : "  setup: (ctx: any) => Record<string, unknown>;",
+        "  app: Record<string, unknown>;",
+        "};",
+        "declare const __MCX_runtime_default_export: __MCX_runtime_export;",
+      ];
+
+      if (!hasScriptDefaultExport) {
+        lines.push("export default __MCX_runtime_default_export;");
+      }
+
+      return `${lines.join("\n")}\n`;
+    } catch {
+      return "";
+    }
+  }
+
+  private resolveRuntimeType(compileData: any): MCXRuntimeType {
+    let type: MCXRuntimeType = "app";
+
+    if (compileData?.strLoc?.Event?.isLoad) {
+      type = "event";
+    }
+    if (compileData?.strLoc?.UI) {
+      type = "ui";
+    }
+    if (Object.keys(compileData?.strLoc?.Component ?? {}).length >= 1) {
+      type = "component";
+    }
+
+    return type;
+  }
+
+  private hasScriptDefaultExport(exportNodes: any[]): boolean {
+    for (const item of exportNodes) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+
+      if (item.type === "ExportDefaultDeclaration") {
+        return true;
+      }
+
+      if (item.type === "ExportNamedDeclaration" && Array.isArray(item.specifiers)) {
+        for (const specifier of item.specifiers) {
+          const exported = specifier?.exported;
+          const exportedName = this.getExportedName(exported);
+          if (exportedName === "default") {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  private getExportedName(node: any): string | undefined {
+    if (!node || typeof node !== "object") {
+      return undefined;
+    }
+    if (typeof node.name === "string") {
+      return node.name;
+    }
+    if (typeof node.value === "string") {
+      return node.value;
+    }
+    return undefined;
+  }
+
   private buildMetadataSection(tags: MCXTagNode[]): string {
     const chunks: string[] = [];
 
@@ -220,7 +306,7 @@ export class MCXVirtualCode implements VirtualCode {
     if (eventTag) {
       const raw = this.firstTextChild(eventTag)?.trim();
       if (raw) {
-        chunks.push(`\n/* MCX Event block */`);
+        chunks.push("\n/* MCX Event block */");
         chunks.push(`const __mcx_event_raw = ${JSON.stringify(raw)};`);
         chunks.push("void __mcx_event_raw;");
       }
@@ -230,7 +316,7 @@ export class MCXVirtualCode implements VirtualCode {
     if (componentTag) {
       const refs = this.collectComponentReferences(componentTag);
       if (refs.length > 0) {
-        chunks.push(`\n/* MCX Component export references */`);
+        chunks.push("\n/* MCX Component export references */");
         for (const ref of refs) {
           chunks.push(`void (${ref});`);
         }
@@ -241,7 +327,7 @@ export class MCXVirtualCode implements VirtualCode {
     if (uiTag) {
       const hasUiBody = this.firstTextChild(uiTag)?.trim();
       if (hasUiBody) {
-        chunks.push(`\n/* MCX Ui block exists */`);
+        chunks.push("\n/* MCX Ui block exists */");
         chunks.push("const __mcx_has_ui_block = true;");
         chunks.push("void __mcx_has_ui_block;");
       }
@@ -251,7 +337,7 @@ export class MCXVirtualCode implements VirtualCode {
       return "";
     }
 
-    return "\n" + chunks.join("\n") + "\n";
+    return `\n${chunks.join("\n")}\n`;
   }
 
   private firstTextChild(tag: MCXTagNode): string | undefined {

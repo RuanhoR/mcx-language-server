@@ -42,6 +42,9 @@ importers:
       '@mbler/mcx-server':
         specifier: workspace:*
         version: link:../server
+      '@mbler/mcx-ts-plugin':
+        specifier: workspace:*
+        version: link:../ts-plugin
       '@types/vscode':
         specifier: ^1.115.0
         version: 1.115.0
@@ -69,6 +72,15 @@ importers:
       vscode-languageserver:
         specifier: ^9.0.1
         version: 9.0.1
+
+  packages/ts-plugin:
+    dependencies:
+      '@mbler/mcx-server':
+        specifier: workspace:*
+        version: link:../server
+      '@volar/typescript':
+        specifier: ^2.4.28
+        version: 2.4.28
 
 packages:
 

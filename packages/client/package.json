@@ -14,7 +14,8 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onLanguage:mcx"
   ],
   "repository": {
     "url": "https://github.com/RuanhoR/mcx-language-server"
@@ -58,10 +59,17 @@
           "meta.embedded.block.script.js.mcx": "javascript"
         }
       }
+    ],
+    "typescriptServerPlugins": [
+      {
+        "name": "@mbler/mcx-ts-plugin",
+        "enableForWorkspaceTypeScriptVersions": true
+      }
     ]
   },
   "dependencies": {
     "@mbler/mcx-core": "^0.0.5",
+    "@mbler/mcx-ts-plugin": "workspace:*",
     "@types/vscode": "^1.115.0",
     "@volar/vscode": "^2.4.28",
     "@mbler/mcx-server": "workspace:*",

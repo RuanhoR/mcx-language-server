@@ -12,7 +12,8 @@
   "packageManager": "pnpm@10.30.3",
   "workspaces": [
     "packages/server",
-    "packages/client"
+    "packages/client",
+    "packages/ts-plugin"
   ],
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.2",
