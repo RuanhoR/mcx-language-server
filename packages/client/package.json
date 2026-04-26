@@ -28,6 +28,18 @@
     "vscode:prepublish": "pnpm build",
     "test": "pnpm build && cd test && pnpm test"
   },
+  "files": [
+    "dist",
+    "language-configuration.json",
+    "syntaxes",
+    "README.md",
+    "tsconfig.json",
+    "package.json",
+    "LICENSE",
+    "node_modules/@mbler/mcx-server/**",
+    "node_modules/@mbler/mcx-ts-plugin/**",
+    "node_modules/@mbler/mcx-core/**"
+  ],
   "contributes": {
     "commands": [
       {
@@ -69,10 +81,13 @@
   },
   "dependencies": {
     "@mbler/mcx-core": "^0.0.5",
+    "@mbler/mcx-server": "workspace:*",
     "@mbler/mcx-ts-plugin": "workspace:*",
     "@types/vscode": "^1.115.0",
     "@volar/vscode": "^2.4.28",
-    "@mbler/mcx-server": "workspace:*",
     "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "vsce": "^2.15.0"
   }
 }

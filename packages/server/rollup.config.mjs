@@ -49,12 +49,12 @@ export default [
       {
         file: './dist/index.js',
         format: 'esm',
-        sourcemap: true,
+        // sourcemap: true,
       },
       {
         file: './dist/index.cjs',
         format: 'cjs',
-        sourcemap: true,
+        // sourcemap: true,
         exports: 'named',
       },
     ],
@@ -66,7 +66,7 @@ export default [
     output: {
       file: './dist/server.js',
       format: 'esm',
-      sourcemap: true,
+      // sourcemap: true,
     },
     external,
     plugins: sharedPlugins,

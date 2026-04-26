@@ -7,4 +7,4 @@ const plugin = createLanguageServicePlugin((tsModule) => {
   };
 });
 
-export default plugin;
+export = plugin;

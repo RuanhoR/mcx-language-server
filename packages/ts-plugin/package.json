@@ -12,7 +12,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
-  "type": "module",
   "dependencies": {
     "@mbler/mcx-server": "workspace:*",
     "@volar/typescript": "^2.4.28"

@@ -84,6 +84,11 @@ function thisId(scriptId: unknown): string {
   }
 
   if (scriptId && typeof scriptId === "object") {
+    const fileName = (scriptId as { fileName?: unknown }).fileName;
+    if (typeof fileName === "string") {
+      return fileName;
+    }
+
     const path = (scriptId as { path?: unknown }).path;
     if (typeof path === "string") {
       return path;

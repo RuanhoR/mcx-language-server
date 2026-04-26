@@ -6,10 +6,14 @@
     "rootDir": "src",
     "outDir": "dist",
     "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+    // "declarationMap": true,
+    // "sourceMap": true,
     "strict": true,
-    "types": ["vscode"]
+    "types": [
+      "vscode"
+    ]
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts"
+  ]
 }

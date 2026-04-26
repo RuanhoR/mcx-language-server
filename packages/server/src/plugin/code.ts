@@ -45,7 +45,7 @@ const DISABLED_FEATURES: NonNullable<CodeMapping["data"]> = {
 type MCXRuntimeType = "app" | "event" | "ui" | "component";
 
 class StringSnapshot implements IScriptSnapshot {
-  constructor(private readonly text: string) {}
+  constructor(private readonly text: string) { }
 
   public getText(start: number, end: number): string {
     return this.text.slice(start, end);
@@ -56,7 +56,7 @@ class StringSnapshot implements IScriptSnapshot {
   }
 
   public getChangeRange(_oldSnapshot: IScriptSnapshot): undefined {
-    return undefined;
+    return void 0;
   }
 }
 
@@ -171,7 +171,7 @@ export class MCXVirtualCode implements VirtualCode {
     const isTypeScript = scriptLang === "ts" || scriptLang === "typescript";
 
     const metadataSection = this.buildMetadataSection(tags);
-    const runtimeSection = this.buildRuntimeModelSection(source);
+    const runtimeSection = this.buildRuntimeModelSection(source, isTypeScript);
     const generated = scriptSource + metadataSection + runtimeSection;
 
     const mappings: CodeMapping[] = [];
@@ -216,30 +216,33 @@ export class MCXVirtualCode implements VirtualCode {
     ]);
   }
 
-  private buildRuntimeModelSection(source: string): string {
+  private buildRuntimeModelSection(source: string, isTypeScript: boolean): string {
     try {
       const compileData = (mcx as any).compiler.compileMCXFn(source);
       const runtimeType = this.resolveRuntimeType(compileData);
       const hasScriptDefaultExport = this.hasScriptDefaultExport(compileData?.JSIR?.BuildCache?.export ?? []);
+      const lines: string[] = ["", "/* MCX runtime compatibility for TypeScript service */"];
 
-      const lines: string[] = [
-        "",
-        "/* MCX runtime compatibility for TypeScript service */",
-        `type __MCX_runtime_type = ${JSON.stringify(runtimeType)};`,
-        "type __MCX_runtime_export = {",
-        "  type: __MCX_runtime_type;",
-        runtimeType === "component"
-          ? "  setup: null;"
-          : "  setup: (ctx: any) => Record<string, unknown>;",
-        "  app: Record<string, unknown>;",
-        "};",
-        "declare const __MCX_runtime_default_export: __MCX_runtime_export;",
-      ];
+      if (isTypeScript) {
+        const runtimeExportType = this.getTypeScriptRuntimeExportType(runtimeType);
+        lines.push(
+          `type __MCX_runtime_type = ${JSON.stringify(runtimeType)};`,
+          `type __MCX_runtime_export = ${runtimeExportType};`,
+          "const __MCX_runtime_default_export = null as unknown as __MCX_runtime_export;",
+        );
 
+        if (!hasScriptDefaultExport) {
+          lines.push("export default __MCX_runtime_default_export;");
+        }
+        return `${lines.join("\n")}\n`;
+      }
+
+      lines.push(
+        `const __MCX_runtime_default_export = { type: ${JSON.stringify(runtimeType)}, setup: ${runtimeType === "component" ? "null" : "undefined"}, app: {} };`,
+      );
       if (!hasScriptDefaultExport) {
         lines.push("export default __MCX_runtime_default_export;");
       }
-
       return `${lines.join("\n")}\n`;
     } catch {
       return "";
@@ -260,6 +263,19 @@ export class MCXVirtualCode implements VirtualCode {
     }
 
     return type;
+  }
+
+  private getTypeScriptRuntimeExportType(runtimeType: MCXRuntimeType): string {
+    if (runtimeType === "app") {
+      return "Parameters<typeof import(\"@mbler/mcx\").createApp>[0]";
+    }
+    if (runtimeType === "event") {
+      return "InstanceType<typeof import(\"@mbler/mcx\").Event>";
+    }
+    if (runtimeType === "ui") {
+      return "InstanceType<typeof import(\"@mbler/mcx\").ui>";
+    }
+    return "{ type: \"component\"; setup: null; app: Record<string, unknown> }";
   }
 
   private hasScriptDefaultExport(exportNodes: any[]): boolean {
@@ -288,7 +304,7 @@ export class MCXVirtualCode implements VirtualCode {
 
   private getExportedName(node: any): string | undefined {
     if (!node || typeof node !== "object") {
-      return undefined;
+      return void 0;
     }
     if (typeof node.name === "string") {
       return node.name;
@@ -296,7 +312,7 @@ export class MCXVirtualCode implements VirtualCode {
     if (typeof node.value === "string") {
       return node.value;
     }
-    return undefined;
+    return void 0;
   }
 
   private buildMetadataSection(tags: MCXTagNode[]): string {
@@ -346,7 +362,7 @@ export class MCXVirtualCode implements VirtualCode {
         return (child as { data: string }).data;
       }
     }
-    return undefined;
+    return void 0;
   }
 
   private collectComponentReferences(componentTag: MCXTagNode): string[] {

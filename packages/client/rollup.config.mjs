@@ -26,7 +26,7 @@ export default {
     dir: "./dist",
     entryFileNames: "[name].js",
     format: "cjs",
-    sourcemap: true,
+    // sourcemap: true,
     exports: "named",
   },
   onwarn(warning, warn) {
