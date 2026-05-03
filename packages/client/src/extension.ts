@@ -41,6 +41,7 @@ const TAG_COMPLETIONS = ["script", "Event", "Component", "Ui", "items", "blocks"
 const COMMON_ATTRIBUTES = ["id", "lang", "@before", "@after"];
 const SCRIPT_LANG_VALUES = ["ts", "js"];
 const TS_PLUGIN_ID = "@mbler/mcx-ts-plugin";
+const EVENT_KEYWORDS = ["import", "Event", "subscribe", "unsubscribe", "event", "useWorld", "createApp"];
 
 let client: LanguageClient | undefined;
 
@@ -165,6 +166,7 @@ async function ensureMCXLanguage(document: TextDocument): Promise<void> {
 
 function provideMCXCompletions(document: TextDocument, position: Position): CompletionItem[] {
   const linePrefix = document.lineAt(position.line).text.slice(0, position.character);
+  const fullLine = document.lineAt(position.line).text;
 
   if (/<[A-Za-z:_-]*$/.test(linePrefix)) {
     return TAG_COMPLETIONS.map((name) => {
@@ -187,6 +189,11 @@ function provideMCXCompletions(document: TextDocument, position: Position): Comp
     });
   }
 
+  const scriptBlock = getScriptBlock(document.getText());
+  if (scriptBlock && isInsideScriptBlockContent(document, position, scriptBlock)) {
+    return provideScriptCompletions(fullLine, position, linePrefix);
+  }
+
   const tagName = currentTagName(linePrefix);
   const attrs = tagName === "script"
     ? [...COMMON_ATTRIBUTES, "lang"]
@@ -202,6 +209,55 @@ function provideMCXCompletions(document: TextDocument, position: Position): Comp
     }
     return item;
   });
+}
+
+function provideScriptCompletions(fullLine: string, position: Position, linePrefix: string): CompletionItem[] {
+  const completions: CompletionItem[] = [];
+
+  if (/import\s*$/.test(linePrefix) || /import\s+[\w$]*$/.test(linePrefix)) {
+    completions.push(
+      new CompletionItem("Event", CompletionItemKind.Module),
+      new CompletionItem("createApp", CompletionItemKind.Function),
+    );
+  }
+
+  if (/import\s+[\w$]*\s+from\s+["'][\w./]*$/.test(linePrefix)) {
+    completions.push(
+      new CompletionItem('"./event"', CompletionItemKind.Reference),
+      new CompletionItem('"./events"', CompletionItemKind.Reference),
+    );
+  }
+
+  if (/ctx\.$/.test(linePrefix) || /ctx\.event/.test(linePrefix)) {
+    completions.push(
+      new CompletionItem("event", CompletionItemKind.Property),
+    );
+  }
+
+  if (/\.subscribe\(?["']?$/.test(linePrefix.trim())) {
+    const minecraftEvents = [
+      "playerJoin", "playerLeave", "playerDie", "playerRespawn",
+      "blockBreak", "blockPlace", "itemUse", "itemUseOn",
+      "entityHit", "entityDie", "projectileHit",
+      "weatherChange", "timeChange",
+    ];
+    for (const evt of minecraftEvents) {
+      const item = new CompletionItem(evt, CompletionItemKind.Event);
+      item.detail = "Minecraft event";
+      completions.push(item);
+    }
+  }
+
+  if (/Event\.$/.test(linePrefix)) {
+    const eventMethods = ["subscribe", "unsubscribe", "useWorld", "createApp"];
+    for (const method of eventMethods) {
+      const item = new CompletionItem(method, CompletionItemKind.Method);
+      item.detail = "Event method";
+      completions.push(item);
+    }
+  }
+
+  return completions;
 }
 
 function provideMCXHover(document: TextDocument, position: Position): Hover | undefined {
@@ -328,6 +384,11 @@ function getScriptBlock(source: string): { start: number; end: number } | undefi
   const end = scriptTag.end?.start ? offsetAt(lineOffsets, scriptTag.end.start) : start;
 
   return { start, end };
+}
+
+function isInsideScriptBlockContent(document: TextDocument, position: Position, script: { start: number; end: number }): boolean {
+  const offset = document.offsetAt(position);
+  return offset >= script.start && offset <= script.end;
 }
 
 function isInsideScriptBlock(document: TextDocument, position: Position, script: { start: number; end: number }): boolean {

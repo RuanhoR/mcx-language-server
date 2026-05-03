@@ -223,6 +223,13 @@ export class MCXVirtualCode implements VirtualCode {
       const hasScriptDefaultExport = this.hasScriptDefaultExport(compileData?.JSIR?.BuildCache?.export ?? []);
       const lines: string[] = ["", "/* MCX runtime compatibility for TypeScript service */"];
 
+      if (runtimeType === "app") {
+        const eventImports = this.extractEventImports(compileData);
+        if (eventImports.length >= 1) {
+          lines.push(...this.buildEventImportsSection(eventImports));
+        }
+      }
+
       if (isTypeScript) {
         const runtimeExportType = this.getTypeScriptRuntimeExportType(runtimeType);
         lines.push(
@@ -247,6 +254,53 @@ export class MCXVirtualCode implements VirtualCode {
     } catch {
       return "";
     }
+  }
+
+  private extractEventImports(compileData: any): Array<{ type: "default" | "all"; as: string; source: string }> {
+    const imports: Array<{ type: "default" | "all"; as: string; source: string }> = [];
+    const importList = compileData?.JSIR?.BuildCache?.import;
+    if (!importList || !Array.isArray(importList)) {
+      return imports;
+    }
+
+    for (const imp of importList) {
+      const source = imp.source;
+      if (!source) continue;
+      const sourcePath = source.toString();
+
+      if (!sourcePath.endsWith(".mcx")) continue;
+
+      for (const impItem of imp.imported || []) {
+        const isAll = impItem.isAll;
+        const impName = impItem.import;
+        if (impName === "default" || isAll) {
+          imports.push({
+            type: isAll ? "all" : "default",
+            as: impItem.as,
+            source: sourcePath
+          });
+        }
+      }
+    }
+    return imports;
+  }
+
+  private buildEventImportsSection(eventImports: Array<{ type: "default" | "all"; as: string; source: string }>): string[] {
+    const lines: string[] = [];
+    lines.push("\n/* MCX event imports for app setup context */");
+
+    lines.push(`type __MCX_event_imports = {`);
+    for (const imp of eventImports) {
+      if (imp.type === "all") {
+        lines.push(`  ${imp.as}: { default: import("@mbler/mcx").Event },`);
+      } else {
+        lines.push(`  ${imp.as}: import("@mbler/mcx").Event ,`);
+      }
+    }
+    lines.push(`};`);
+
+    lines.push("declare const __MCX_ctx: import(\"@mbler/mcx-types\").MCXCtx;");
+    return lines;
   }
 
   private resolveRuntimeType(compileData: any): MCXRuntimeType {
