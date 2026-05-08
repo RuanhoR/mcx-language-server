@@ -243,20 +243,29 @@ export class MCXVirtualCode implements VirtualCode {
         '/* MCX runtime compatibility for TypeScript service */',
       ]
 
+      let appData = '{}'
+      let eventImports: ReturnType<typeof this.extractEventImports> = []
       if (runtimeType === 'app') {
-        const eventImports = this.extractEventImports(compileData)
+        eventImports = this.extractEventImports(compileData)
         if (eventImports.length >= 1) {
           lines.push(...this.buildEventImportsSection(eventImports))
+          appData = '__MCX_app_data'
         }
       }
 
       if (isTypeScript) {
         const runtimeExportType =
-          this.getTypeScriptRuntimeExportType(runtimeType)
+          this.getTypeScriptRuntimeExportType(runtimeType, eventImports.length >= 1)
         lines.push(
           `type __MCX_runtime_type = ${JSON.stringify(runtimeType)};`,
           `type __MCX_runtime_export = ${runtimeExportType};`,
-          'const __MCX_runtime_default_export = null as unknown as __MCX_runtime_export;',
+        )
+
+        const runtimeApp = runtimeType === 'app' && eventImports.length >= 1
+          ? '__MCX_app_data'
+          : '{}'
+        lines.push(
+          `const __MCX_runtime_default_export = null as unknown as __MCX_runtime_export & { app: ${runtimeApp} };`,
         )
 
         if (!hasScriptDefaultExport) {
@@ -266,7 +275,7 @@ export class MCXVirtualCode implements VirtualCode {
       }
 
       lines.push(
-        `const __MCX_runtime_default_export = { type: ${JSON.stringify(runtimeType)}, setup: ${runtimeType === 'component' ? 'null' : 'undefined'}, app: {} };`,
+        `const __MCX_runtime_default_export = { type: ${JSON.stringify(runtimeType)}, setup: ${runtimeType === 'component' ? 'null' : 'undefined'}, app: ${appData} };`,
       )
       if (!hasScriptDefaultExport) {
         lines.push('export default __MCX_runtime_default_export;')
@@ -325,14 +334,34 @@ export class MCXVirtualCode implements VirtualCode {
     lines.push(`type __MCX_event_imports = {`)
     for (const imp of eventImports) {
       if (imp.type === 'all') {
-        lines.push(`  ${imp.as}: { default: import("@mbler/mcx").Event },`)
+        lines.push(`  ${imp.as}: { default: import("@mbler/mcx-types").Event },`)
       } else {
-        lines.push(`  ${imp.as}: import("@mbler/mcx").Event ,`)
+        lines.push(`  ${imp.as}: import("@mbler/mcx-types").Event ,`)
       }
     }
     lines.push(`};`)
 
     lines.push('declare const __MCX_ctx: import("@mbler/mcx-types").MCXCtx;')
+
+    if (eventImports.length >= 1) {
+      lines.push('\n/* MCX event runtime transforms */')
+      const varDeclarations: string[] = []
+      const eventValues: string[] = []
+
+      eventImports.forEach((imp, index) => {
+        if (imp.type === 'all') {
+          varDeclarations.push(`const ${imp.as} = { default: __MCX_ctx.event[${index}] };`)
+          eventValues.push(`${imp.as}.default`)
+        } else {
+          varDeclarations.push(`const ${imp.as} = __MCX_ctx.event[${index}];`)
+          eventValues.push(imp.as)
+        }
+      })
+
+      lines.push(...varDeclarations)
+      lines.push(`const __MCX_app_data = { event: [${eventValues.join(', ')}] };`)
+    }
+
     return lines
   }
 
@@ -352,8 +381,11 @@ export class MCXVirtualCode implements VirtualCode {
     return type
   }
 
-  private getTypeScriptRuntimeExportType(runtimeType: MCXRuntimeType): string {
+  private getTypeScriptRuntimeExportType(runtimeType: MCXRuntimeType, hasEventImports: boolean = false): string {
     if (runtimeType === 'app') {
+      if (hasEventImports) {
+        return '{ type: "app"; setup: (ctx: import("@mbler/mcx-types").MCXCtx) => any; app: { event: import("@mbler/mcx-types").Event[] } }'
+      }
       return 'Parameters<typeof import("@mbler/mcx").createApp>[0]'
     }
     if (runtimeType === 'event') {
