@@ -1,12 +1,14 @@
 {
   "name": "mcx-vscode-client",
-  "version": "1.0.0",
-  "displayName": "MCX Language Support for vscode(cli by mbler)",
-  "description": "MCX VSCode Client",
+  "version": "1.0.1",
+  "description": "Lanuage support for MCX language.",
   "publisher": "ruanhor",
   "license": "MIT",
-  "author": "ruanhor",
-  "packageManager": "pnpm@10.30.3",
+  "author": {
+    "url": "https://github.com/RuanhoR",
+    "name": "ruanhor",
+    "email": "root@ruanhor.dpdns.org"
+  },
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -22,24 +24,20 @@
   },
   "main": "dist/extension.js",
   "types": "dist/extension.d.ts",
-  "scripts": {
-    "build": "rollup -c",
-    "vscode-build": "node scripts/vscode-build.js",
-    "vscode:prepublish": "pnpm build",
-    "test": "pnpm build && cd test && pnpm test"
-  },
   "files": [
     "dist",
+    "node_modules",
     "language-configuration.json",
-    "syntaxes",
+    "syntaxes/mcx.tmLanguage.json",
     "README.md",
-    "tsconfig.json",
-    "package.json",
-    "LICENSE",
-    "node_modules/@mbler/mcx-server/**",
-    "node_modules/@mbler/mcx-ts-plugin/**",
-    "node_modules/@mbler/mcx-core/**"
+    "LICENSE"
   ],
+  "scripts": {
+    "build": "rollup -c",
+    "pack": "vsce package --allow-unused-files-pattern",
+    "test": "pnpm build && cd test && pnpm test"
+  },
+  "displayName": "MCX Language",
   "contributes": {
     "commands": [
       {
@@ -81,13 +79,13 @@
   },
   "dependencies": {
     "@mbler/mcx-core": "^0.0.5",
-    "@mbler/mcx-server": "workspace:*",
-    "@mbler/mcx-ts-plugin": "workspace:*",
+    "@mbler/mcx-server": "0.1.1-beta.r20260508.1",
+    "@mbler/mcx-ts-plugin": "0.1.1-alpha.r20260420.1",
     "@types/vscode": "^1.115.0",
     "@volar/vscode": "^2.4.28",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
-    "vsce": "^2.15.0"
+    "@vscode/vsce": "^3.9.1"
   }
 }

@@ -1,68 +1,57 @@
-import * as mcx from "@mbler/mcx-core";
-import type { CodeMapping, IScriptSnapshot, VirtualCode } from "@volar/language-core";
+import * as mcx from '@mbler/mcx-core'
+import type {
+  CodeMapping,
+  IScriptSnapshot,
+  VirtualCode,
+} from '@volar/language-core'
 
-interface MCXPosition {
-  line: number;
-  column: number;
-}
-
-interface MCXTokenLike {
-  data: string;
-  start: MCXPosition;
-}
-
-interface MCXTagNode {
-  name: string;
-  arr?: Record<string, unknown>;
-  start: MCXTokenLike;
-  end: MCXTokenLike | null;
-  content: Array<MCXTagNode | { type: "TagContent"; data: string } | { type: "Comment"; data: string }>;
-}
+type MCXPosition = mcx.PUBTYPE.MCXPosition
+type MCXTagNode = mcx.PUBTYPE.ParsedTagNode
 
 interface TagContentRange {
-  start: number;
-  end: number;
+  start: number
+  end: number
 }
 
-const FULL_FEATURES: NonNullable<CodeMapping["data"]> = {
+const FULL_FEATURES: NonNullable<CodeMapping['data']> = {
   verification: true,
   completion: true,
   semantic: true,
   navigation: true,
   structure: true,
   format: true,
-};
+}
 
-const DISABLED_FEATURES: NonNullable<CodeMapping["data"]> = {
+const DISABLED_FEATURES: NonNullable<CodeMapping['data']> = {
   verification: false,
   completion: false,
   semantic: false,
   navigation: false,
   structure: false,
   format: false,
-};
+}
 
-type MCXRuntimeType = "app" | "event" | "ui" | "component";
+type MCXRuntimeType = 'app' | 'event' | 'ui' | 'component'
 
 class StringSnapshot implements IScriptSnapshot {
-  constructor(private readonly text: string) { }
+  constructor(private readonly text: string) {}
 
   public getText(start: number, end: number): string {
-    return this.text.slice(start, end);
+    return this.text.slice(start, end)
   }
 
   public getLength(): number {
-    return this.text.length;
+    return this.text.length
   }
 
   public getChangeRange(_oldSnapshot: IScriptSnapshot): undefined {
-    return void 0;
+    return void 0
   }
 }
 
 class EmbeddedCode implements VirtualCode {
-  public readonly embeddedCodes: VirtualCode[] = [];
-  public readonly snapshot: IScriptSnapshot;
+  public readonly embeddedCodes: VirtualCode[] = []
+  public readonly snapshot: IScriptSnapshot
 
   constructor(
     public readonly id: string,
@@ -70,7 +59,7 @@ class EmbeddedCode implements VirtualCode {
     content: string,
     public readonly mappings: CodeMapping[],
   ) {
-    this.snapshot = new StringSnapshot(content);
+    this.snapshot = new StringSnapshot(content)
   }
 }
 
@@ -81,26 +70,26 @@ class EmbeddedCode implements VirtualCode {
  * and expose raw embedded ranges for Event/Component/UI so mappings remain complete.
  */
 export class MCXVirtualCode implements VirtualCode {
-  public readonly languageId = "mcx" as const;
-  public readonly id = "root" as const;
-  public snapshot: IScriptSnapshot;
-  public mappings: CodeMapping[] = [];
-  public embeddedCodes: VirtualCode[] = [];
+  public readonly languageId = 'mcx' as const
+  public readonly id = 'root' as const
+  public snapshot: IScriptSnapshot
+  public mappings: CodeMapping[] = []
+  public embeddedCodes: VirtualCode[] = []
 
   constructor(snapshot: IScriptSnapshot) {
-    this.snapshot = snapshot;
-    this.rebuild();
+    this.snapshot = snapshot
+    this.rebuild()
   }
 
   public update(newSnapshot: IScriptSnapshot): void {
-    this.snapshot = newSnapshot;
-    this.rebuild();
+    this.snapshot = newSnapshot
+    this.rebuild()
   }
 
   private rebuild(): void {
-    const source = this.snapshot.getText(0, this.snapshot.getLength());
-    const lineOffsets = this.computeLineOffsets(source);
-    const tags = this.parseTagNodes(source);
+    const source = this.snapshot.getText(0, this.snapshot.getLength())
+    const lineOffsets = this.computeLineOffsets(source)
+    const tags = this.parseTagNodes(source)
 
     this.mappings = [
       {
@@ -109,49 +98,72 @@ export class MCXVirtualCode implements VirtualCode {
         lengths: [this.snapshot.getLength()],
         data: DISABLED_FEATURES,
       },
-    ];
+    ]
 
-    this.embeddedCodes = [];
+    this.embeddedCodes = []
 
-    const scriptTag = tags.find((tag) => tag.name === "script");
+    const scriptTag = tags.find(tag => tag.name === 'script')
     if (scriptTag) {
-      const scriptCode = this.createServiceScriptEmbedded(source, scriptTag, lineOffsets, tags);
+      const scriptCode = this.createServiceScriptEmbedded(
+        source,
+        scriptTag,
+        lineOffsets,
+        tags,
+      )
       if (scriptCode) {
-        this.embeddedCodes.push(scriptCode);
+        this.embeddedCodes.push(scriptCode)
       }
     }
 
-    const eventTag = tags.find((tag) => tag.name === "Event");
+    const eventTag = tags.find(tag => tag.name === 'Event')
     if (eventTag) {
-      const eventRaw = this.createRawEmbedded("event-raw", "mcx", source, eventTag, lineOffsets);
+      const eventRaw = this.createRawEmbedded(
+        'event-raw',
+        'mcx',
+        source,
+        eventTag,
+        lineOffsets,
+      )
       if (eventRaw) {
-        this.embeddedCodes.push(eventRaw);
+        this.embeddedCodes.push(eventRaw)
       }
     }
 
-    const componentTag = tags.find((tag) => tag.name === "Component");
+    const componentTag = tags.find(tag => tag.name === 'Component')
     if (componentTag) {
-      const componentRaw = this.createRawEmbedded("component-raw", "mcx", source, componentTag, lineOffsets);
+      const componentRaw = this.createRawEmbedded(
+        'component-raw',
+        'mcx',
+        source,
+        componentTag,
+        lineOffsets,
+      )
       if (componentRaw) {
-        this.embeddedCodes.push(componentRaw);
+        this.embeddedCodes.push(componentRaw)
       }
     }
 
-    const uiTag = tags.find((tag) => tag.name === "Ui");
+    const uiTag = tags.find(tag => tag.name === 'Ui')
     if (uiTag) {
-      const uiRaw = this.createRawEmbedded("ui-raw", "mcx", source, uiTag, lineOffsets);
+      const uiRaw = this.createRawEmbedded(
+        'ui-raw',
+        'mcx',
+        source,
+        uiTag,
+        lineOffsets,
+      )
       if (uiRaw) {
-        this.embeddedCodes.push(uiRaw);
+        this.embeddedCodes.push(uiRaw)
       }
     }
   }
 
   private parseTagNodes(source: string): MCXTagNode[] {
     try {
-      const parser = new (mcx as any).AST.tag(source);
-      return parser.parseAST() as MCXTagNode[];
+      const parser = new (mcx as any).AST.tag(source)
+      return parser.parseAST() as MCXTagNode[]
     } catch {
-      return [];
+      return []
     }
   }
 
@@ -161,35 +173,35 @@ export class MCXVirtualCode implements VirtualCode {
     lineOffsets: number[],
     tags: MCXTagNode[],
   ): EmbeddedCode | null {
-    const range = this.getTagContentRange(source, scriptTag, lineOffsets);
+    const range = this.getTagContentRange(source, scriptTag, lineOffsets)
     if (!range) {
-      return null;
+      return null
     }
 
-    const scriptSource = source.slice(range.start, range.end);
-    const scriptLang = (scriptTag.arr?.lang ?? "").toString().toLowerCase();
-    const isTypeScript = scriptLang === "ts" || scriptLang === "typescript";
+    const scriptSource = source.slice(range.start, range.end)
+    const scriptLang = (scriptTag.arr?.lang ?? '').toString().toLowerCase()
+    const isTypeScript = scriptLang === 'ts' || scriptLang === 'typescript'
 
-    const metadataSection = this.buildMetadataSection(tags);
-    const runtimeSection = this.buildRuntimeModelSection(source, isTypeScript);
-    const generated = scriptSource + metadataSection + runtimeSection;
+    const metadataSection = this.buildMetadataSection(tags)
+    const runtimeSection = this.buildRuntimeModelSection(source, isTypeScript)
+    const generated = scriptSource + metadataSection + runtimeSection
 
-    const mappings: CodeMapping[] = [];
+    const mappings: CodeMapping[] = []
     if (scriptSource.length > 0) {
       mappings.push({
         sourceOffsets: [range.start],
         generatedOffsets: [0],
         lengths: [scriptSource.length],
         data: FULL_FEATURES,
-      });
+      })
     }
 
     return new EmbeddedCode(
-      "script",
-      isTypeScript ? "typescript" : "javascript",
+      'script',
+      isTypeScript ? 'typescript' : 'javascript',
       generated,
       mappings,
-    );
+    )
   }
 
   private createRawEmbedded(
@@ -199,12 +211,12 @@ export class MCXVirtualCode implements VirtualCode {
     tag: MCXTagNode,
     lineOffsets: number[],
   ): EmbeddedCode | null {
-    const range = this.getTagContentRange(source, tag, lineOffsets);
+    const range = this.getTagContentRange(source, tag, lineOffsets)
     if (!range) {
-      return null;
+      return null
     }
 
-    const content = source.slice(range.start, range.end);
+    const content = source.slice(range.start, range.end)
 
     return new EmbeddedCode(id, languageId, content, [
       {
@@ -213,283 +225,324 @@ export class MCXVirtualCode implements VirtualCode {
         lengths: [content.length],
         data: DISABLED_FEATURES,
       },
-    ]);
+    ])
   }
 
-  private buildRuntimeModelSection(source: string, isTypeScript: boolean): string {
+  private buildRuntimeModelSection(
+    source: string,
+    isTypeScript: boolean,
+  ): string {
     try {
-      const compileData = (mcx as any).compiler.compileMCXFn(source);
-      const runtimeType = this.resolveRuntimeType(compileData);
-      const hasScriptDefaultExport = this.hasScriptDefaultExport(compileData?.JSIR?.BuildCache?.export ?? []);
-      const lines: string[] = ["", "/* MCX runtime compatibility for TypeScript service */"];
+      const compileData = (mcx as any).compiler.compileMCXFn(source)
+      const runtimeType = this.resolveRuntimeType(compileData)
+      const hasScriptDefaultExport = this.hasScriptDefaultExport(
+        compileData?.JSIR?.BuildCache?.export ?? [],
+      )
+      const lines: string[] = [
+        '',
+        '/* MCX runtime compatibility for TypeScript service */',
+      ]
 
-      if (runtimeType === "app") {
-        const eventImports = this.extractEventImports(compileData);
+      if (runtimeType === 'app') {
+        const eventImports = this.extractEventImports(compileData)
         if (eventImports.length >= 1) {
-          lines.push(...this.buildEventImportsSection(eventImports));
+          lines.push(...this.buildEventImportsSection(eventImports))
         }
       }
 
       if (isTypeScript) {
-        const runtimeExportType = this.getTypeScriptRuntimeExportType(runtimeType);
+        const runtimeExportType =
+          this.getTypeScriptRuntimeExportType(runtimeType)
         lines.push(
           `type __MCX_runtime_type = ${JSON.stringify(runtimeType)};`,
           `type __MCX_runtime_export = ${runtimeExportType};`,
-          "const __MCX_runtime_default_export = null as unknown as __MCX_runtime_export;",
-        );
+          'const __MCX_runtime_default_export = null as unknown as __MCX_runtime_export;',
+        )
 
         if (!hasScriptDefaultExport) {
-          lines.push("export default __MCX_runtime_default_export;");
+          lines.push('export default __MCX_runtime_default_export;')
         }
-        return `${lines.join("\n")}\n`;
+        return `${lines.join('\n')}\n`
       }
 
       lines.push(
-        `const __MCX_runtime_default_export = { type: ${JSON.stringify(runtimeType)}, setup: ${runtimeType === "component" ? "null" : "undefined"}, app: {} };`,
-      );
+        `const __MCX_runtime_default_export = { type: ${JSON.stringify(runtimeType)}, setup: ${runtimeType === 'component' ? 'null' : 'undefined'}, app: {} };`,
+      )
       if (!hasScriptDefaultExport) {
-        lines.push("export default __MCX_runtime_default_export;");
+        lines.push('export default __MCX_runtime_default_export;')
       }
-      return `${lines.join("\n")}\n`;
+      return `${lines.join('\n')}\n`
     } catch {
-      return "";
+      return ''
     }
   }
 
-  private extractEventImports(compileData: any): Array<{ type: "default" | "all"; as: string; source: string }> {
-    const imports: Array<{ type: "default" | "all"; as: string; source: string }> = [];
-    const importList = compileData?.JSIR?.BuildCache?.import;
+  private extractEventImports(
+    compileData: any,
+  ): Array<{ type: 'default' | 'all'; as: string; source: string }> {
+    const imports: Array<{
+      type: 'default' | 'all'
+      as: string
+      source: string
+    }> = []
+    const importList = compileData?.JSIR?.BuildCache?.import
     if (!importList || !Array.isArray(importList)) {
-      return imports;
+      return imports
     }
 
     for (const imp of importList) {
-      const source = imp.source;
-      if (!source) continue;
-      const sourcePath = source.toString();
+      const source = imp.source
+      if (!source) continue
+      const sourcePath = source.toString()
 
-      if (!sourcePath.endsWith(".mcx")) continue;
+      if (!sourcePath.endsWith('.mcx')) continue
 
       for (const impItem of imp.imported || []) {
-        const isAll = impItem.isAll;
-        const impName = impItem.import;
-        if (impName === "default" || isAll) {
+        const isAll = impItem.isAll
+        const impName = impItem.import
+        if (impName === 'default' || isAll) {
           imports.push({
-            type: isAll ? "all" : "default",
+            type: isAll ? 'all' : 'default',
             as: impItem.as,
-            source: sourcePath
-          });
+            source: sourcePath,
+          })
         }
       }
     }
-    return imports;
+    return imports
   }
 
-  private buildEventImportsSection(eventImports: Array<{ type: "default" | "all"; as: string; source: string }>): string[] {
-    const lines: string[] = [];
-    lines.push("\n/* MCX event imports for app setup context */");
+  private buildEventImportsSection(
+    eventImports: Array<{
+      type: 'default' | 'all'
+      as: string
+      source: string
+    }>,
+  ): string[] {
+    const lines: string[] = []
+    lines.push('\n/* MCX event imports for app setup context */')
 
-    lines.push(`type __MCX_event_imports = {`);
+    lines.push(`type __MCX_event_imports = {`)
     for (const imp of eventImports) {
-      if (imp.type === "all") {
-        lines.push(`  ${imp.as}: { default: import("@mbler/mcx").Event },`);
+      if (imp.type === 'all') {
+        lines.push(`  ${imp.as}: { default: import("@mbler/mcx").Event },`)
       } else {
-        lines.push(`  ${imp.as}: import("@mbler/mcx").Event ,`);
+        lines.push(`  ${imp.as}: import("@mbler/mcx").Event ,`)
       }
     }
-    lines.push(`};`);
+    lines.push(`};`)
 
-    lines.push("declare const __MCX_ctx: import(\"@mbler/mcx-types\").MCXCtx;");
-    return lines;
+    lines.push('declare const __MCX_ctx: import("@mbler/mcx-types").MCXCtx;')
+    return lines
   }
 
   private resolveRuntimeType(compileData: any): MCXRuntimeType {
-    let type: MCXRuntimeType = "app";
+    let type: MCXRuntimeType = 'app'
 
     if (compileData?.strLoc?.Event?.isLoad) {
-      type = "event";
+      type = 'event'
     }
     if (compileData?.strLoc?.UI) {
-      type = "ui";
+      type = 'ui'
     }
     if (Object.keys(compileData?.strLoc?.Component ?? {}).length >= 1) {
-      type = "component";
+      type = 'component'
     }
 
-    return type;
+    return type
   }
 
   private getTypeScriptRuntimeExportType(runtimeType: MCXRuntimeType): string {
-    if (runtimeType === "app") {
-      return "Parameters<typeof import(\"@mbler/mcx\").createApp>[0]";
+    if (runtimeType === 'app') {
+      return 'Parameters<typeof import("@mbler/mcx").createApp>[0]'
     }
-    if (runtimeType === "event") {
-      return "InstanceType<typeof import(\"@mbler/mcx\").Event>";
+    if (runtimeType === 'event') {
+      return 'InstanceType<typeof import("@mbler/mcx").Event>'
     }
-    if (runtimeType === "ui") {
-      return "InstanceType<typeof import(\"@mbler/mcx\").ui>";
+    if (runtimeType === 'ui') {
+      return 'InstanceType<typeof import("@mbler/mcx").ui>'
     }
-    return "{ type: \"component\"; setup: null; app: Record<string, unknown> }";
+    return '{ type: "component"; setup: null; app: Record<string, unknown> }'
   }
 
   private hasScriptDefaultExport(exportNodes: any[]): boolean {
     for (const item of exportNodes) {
-      if (!item || typeof item !== "object") {
-        continue;
+      if (!item || typeof item !== 'object') {
+        continue
       }
 
-      if (item.type === "ExportDefaultDeclaration") {
-        return true;
+      if (item.type === 'ExportDefaultDeclaration') {
+        return true
       }
 
-      if (item.type === "ExportNamedDeclaration" && Array.isArray(item.specifiers)) {
+      if (
+        item.type === 'ExportNamedDeclaration' &&
+        Array.isArray(item.specifiers)
+      ) {
         for (const specifier of item.specifiers) {
-          const exported = specifier?.exported;
-          const exportedName = this.getExportedName(exported);
-          if (exportedName === "default") {
-            return true;
+          const exported = specifier?.exported
+          const exportedName = this.getExportedName(exported)
+          if (exportedName === 'default') {
+            return true
           }
         }
       }
     }
 
-    return false;
+    return false
   }
 
   private getExportedName(node: any): string | undefined {
-    if (!node || typeof node !== "object") {
-      return void 0;
+    if (!node || typeof node !== 'object') {
+      return void 0
     }
-    if (typeof node.name === "string") {
-      return node.name;
+    if (typeof node.name === 'string') {
+      return node.name
     }
-    if (typeof node.value === "string") {
-      return node.value;
+    if (typeof node.value === 'string') {
+      return node.value
     }
-    return void 0;
+    return void 0
   }
 
   private buildMetadataSection(tags: MCXTagNode[]): string {
-    const chunks: string[] = [];
+    const chunks: string[] = []
 
-    const eventTag = tags.find((tag) => tag.name === "Event");
+    const eventTag = tags.find(tag => tag.name === 'Event')
     if (eventTag) {
-      const raw = this.firstTextChild(eventTag)?.trim();
+      const raw = this.firstTextChild(eventTag)?.trim()
       if (raw) {
-        chunks.push("\n/* MCX Event block */");
-        chunks.push(`const __mcx_event_raw = ${JSON.stringify(raw)};`);
-        chunks.push("void __mcx_event_raw;");
+        chunks.push('\n/* MCX Event block */')
+        chunks.push(`const __mcx_event_raw = ${JSON.stringify(raw)};`)
+        chunks.push('void __mcx_event_raw;')
       }
     }
 
-    const componentTag = tags.find((tag) => tag.name === "Component");
+    const componentTag = tags.find(tag => tag.name === 'Component')
     if (componentTag) {
-      const refs = this.collectComponentReferences(componentTag);
+      const refs = this.collectComponentReferences(componentTag)
       if (refs.length > 0) {
-        chunks.push("\n/* MCX Component export references */");
+        chunks.push('\n/* MCX Component export references */')
         for (const ref of refs) {
-          chunks.push(`void (${ref});`);
+          chunks.push(`void (${ref});`)
         }
       }
     }
 
-    const uiTag = tags.find((tag) => tag.name === "Ui");
+    const uiTag = tags.find(tag => tag.name === 'Ui')
     if (uiTag) {
-      const hasUiBody = this.firstTextChild(uiTag)?.trim();
+      const hasUiBody = this.firstTextChild(uiTag)?.trim()
       if (hasUiBody) {
-        chunks.push("\n/* MCX Ui block exists */");
-        chunks.push("const __mcx_has_ui_block = true;");
-        chunks.push("void __mcx_has_ui_block;");
+        chunks.push('\n/* MCX Ui block exists */')
+        chunks.push('const __mcx_has_ui_block = true;')
+        chunks.push('void __mcx_has_ui_block;')
       }
     }
 
     if (chunks.length === 0) {
-      return "";
+      return ''
     }
 
-    return `\n${chunks.join("\n")}\n`;
+    return `\n${chunks.join('\n')}\n`
   }
 
   private firstTextChild(tag: MCXTagNode): string | undefined {
     for (const child of tag.content) {
-      if ((child as { type?: string }).type === "TagContent") {
-        return (child as { data: string }).data;
+      if ((child as { type?: string }).type === 'TagContent') {
+        return (child as { data: string }).data
       }
     }
-    return void 0;
+    return void 0
   }
 
   private collectComponentReferences(componentTag: MCXTagNode): string[] {
-    const refs: string[] = [];
+    const refs: string[] = []
 
     for (const parent of componentTag.content) {
       if (!this.isTagNode(parent)) {
-        continue;
+        continue
       }
 
       for (const item of parent.content) {
         if (!this.isTagNode(item)) {
-          continue;
+          continue
         }
 
-        const ref = this.firstTextChild(item)?.trim();
+        const ref = this.firstTextChild(item)?.trim()
         if (!ref) {
-          continue;
+          continue
         }
 
         // Keep reference lines syntax-safe to avoid polluting diagnostics.
         if (this.isSafeReferenceExpression(ref)) {
-          refs.push(ref);
+          refs.push(ref)
         }
       }
     }
 
-    return refs;
+    return refs
   }
 
   private isSafeReferenceExpression(value: string): boolean {
-    return /^[$_A-Za-z][$_A-Za-z0-9]*(?:\.[$_A-Za-z][$_A-Za-z0-9]*)*$/.test(value);
+    return /^[$_A-Za-z][$_A-Za-z0-9]*(?:\.[$_A-Za-z][$_A-Za-z0-9]*)*$/.test(
+      value,
+    )
   }
 
   private isTagNode(node: unknown): node is MCXTagNode {
-    return !!node && typeof node === "object" && "name" in (node as object) && "start" in (node as object);
+    return (
+      !!node &&
+      typeof node === 'object' &&
+      'name' in (node as object) &&
+      'start' in (node as object)
+    )
   }
 
-  private getTagContentRange(source: string, tag: MCXTagNode, lineOffsets: number[]): TagContentRange | null {
+  private getTagContentRange(
+    source: string,
+    tag: MCXTagNode,
+    lineOffsets: number[],
+  ): TagContentRange | null {
     if (!tag.start || !tag.start.start) {
-      return null;
+      return null
     }
 
-    const startOffset = this.offsetAt(lineOffsets, tag.start.start);
-    const startTagEnd = Math.min(source.length, startOffset + (tag.start.data?.length ?? 0));
+    const startOffset = this.offsetAt(lineOffsets, tag.start.start)
+    const startTagEnd = Math.min(
+      source.length,
+      startOffset + (tag.start.data?.length ?? 0),
+    )
 
-    let endTagStart = startTagEnd;
+    let endTagStart = startTagEnd
     if (tag.end?.start) {
-      endTagStart = this.offsetAt(lineOffsets, tag.end.start);
+      endTagStart = this.offsetAt(lineOffsets, tag.end.start)
     }
 
     if (endTagStart < startTagEnd) {
-      endTagStart = startTagEnd;
+      endTagStart = startTagEnd
     }
 
     return {
       start: startTagEnd,
       end: Math.min(source.length, endTagStart),
-    };
+    }
   }
 
   private computeLineOffsets(text: string): number[] {
-    const offsets = [0];
+    const offsets = [0]
     for (let i = 0; i < text.length; i++) {
       if (text.charCodeAt(i) === 10) {
-        offsets.push(i + 1);
+        offsets.push(i + 1)
       }
     }
-    return offsets;
+    return offsets
   }
 
   private offsetAt(lineOffsets: number[], position: MCXPosition): number {
-    const lineIndex = Math.max(0, Math.min(lineOffsets.length - 1, position.line - 1));
-    return lineOffsets[lineIndex] + Math.max(0, position.column);
+    const lineIndex = Math.max(
+      0,
+      Math.min(lineOffsets.length - 1, position.line - 1),
+    )
+    return lineOffsets[lineIndex] + Math.max(0, position.column)
   }
 }

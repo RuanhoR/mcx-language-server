@@ -2,6 +2,7 @@ import { createServerBase } from "@volar/language-server/lib/server.js";
 import { provider as httpFileSystemProvider, listenEditorSettings } from "@volar/language-server/lib/fileSystemProviders/http.js";
 import { provider as nodeFileSystemProvider } from "@volar/language-server/lib/fileSystemProviders/node.js";
 import { createTypeScriptProject } from "@volar/language-server/lib/project/typescriptProject.js";
+import { create as createTypeScriptServices } from "volar-service-typescript";
 import * as lsp from "vscode-languageserver/node.js";
 import ts from "typescript";
 import { createMCXLanguagePlugin } from "./plugin/index.js";
@@ -25,13 +26,18 @@ const server = createServerBase(connection, {
 const mcxLanguagePlugin = createMCXLanguagePlugin(ts);
 
 connection.onInitialize((params) => {
+  console.error("[MCX] onInitialize called");
+
+  const typescriptServices = createTypeScriptServices(ts);
+  console.error("[MCX] TypeScript services created, capabilities:", Object.keys(typescriptServices));
+
   const project = createTypeScriptProject(ts, undefined, async () => ({
     languagePlugins: [mcxLanguagePlugin],
   }));
 
-  // Language service plugins are intentionally empty here.
-  // We currently rely on the TypeScript project integration + language plugin mappings.
-  return server.initialize(params, project, []);
+  const result = server.initialize(params, project, typescriptServices);
+  console.error("[MCX] server.initialize returned");
+  return result;
 });
 
 connection.onInitialized(() => {

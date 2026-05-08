@@ -12,7 +12,7 @@ function createRegex(...a) {
 }
 const external = [
   /^node:/,
-  createRegex(
+  ...createRegex(
     'typescript',
     '@volar/language-core',
     '@volar/language-server',
@@ -23,7 +23,8 @@ const external = [
     '@mbler/mcx-core',
     'vscode-languageserver',
     'typescript',
-    '@volar/language-service'
+    '@volar/language-service',
+    'typescript-auto-import-cache'
   ),
   'typescript',
   '@volar/language-core',
@@ -37,6 +38,7 @@ const external = [
   'typescript',
   '@volar/language-service',
   'fs',
+  'semver',
   '@volar/language-server/lib/fileSystemProviders/http.js',
   '@volar/language-server/lib/fileSystemProviders/node.js',
   '@volar/language-server/lib/project/typescriptProject.js'
@@ -49,12 +51,12 @@ export default [
       {
         file: './dist/index.js',
         format: 'esm',
-        // sourcemap: true,
+        sourcemap: true,
       },
       {
         file: './dist/index.cjs',
         format: 'cjs',
-        // sourcemap: true,
+        sourcemap: true,
         exports: 'named',
       },
     ],
@@ -66,7 +68,7 @@ export default [
     output: {
       file: './dist/server.js',
       format: 'esm',
-      // sourcemap: true,
+      sourcemap: true,
     },
     external,
     plugins: sharedPlugins,

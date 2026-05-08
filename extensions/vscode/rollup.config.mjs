@@ -7,16 +7,6 @@ const plugins = [
   resolve({ preferBuiltins: true }),
   tsPlugin({ tsconfig: "./tsconfig.json" }),
 ];
-
-const external = [
-  /^node:/,
-  "vscode",
-  "@volar/vscode",
-  "@mbler/mcx-core",
-  "vscode-languageclient",
-  "vscode-languageclient/node",
-];
-
 export default {
   input: {
     extension: "./src/extension.ts",
@@ -39,6 +29,17 @@ export default {
     }
     warn(warning);
   },
-  external,
   plugins,
+  external: [
+    /^vscode.+?/,
+    "vscode",
+    /^typescript.+?/,
+    "tslib",
+    "fs",
+    /^node:*/,
+    /@mbler\/mcx-core/,
+    "semver",
+    /@mbler\/mcx-server/,
+    "@mbler/ts-plugin"
+  ]
 };

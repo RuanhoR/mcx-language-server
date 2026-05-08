@@ -1,6 +1,6 @@
 {
   "name": "@mbler/mcx-server",
-  "version": "0.1.1-beta.r20260423.1",
+  "version": "0.1.1-beta.r20260508.1",
   "description": "MCX Language Server",
   "license": "MIT",
   "author": {
@@ -34,6 +34,7 @@
     "@mbler/mcx-core": "^0.0.5",
     "@volar/language-core": "^2.4.28",
     "@volar/language-server": "^2.4.28",
+    "volar-service-typescript": "^0.0.70",
     "typescript": "5.9.3",
     "vscode-languageserver": "^9.0.1"
   },
