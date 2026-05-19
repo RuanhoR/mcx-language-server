@@ -1,14 +1,14 @@
 # MCX Language server
 
-## About
+## About repo
 
-[MCX Language Core](//github.com/RuanhoR/mcx-core) | [Mbler Cli](//github.com/RuanhoR/mbler)
+[MCX CORE](https://github.com/RuanhoR/mcx-core) | [MCX Language Server](https://github.com/RuanhoR/mcx-language-server) | [MCX Template](https://github.com/RuanhoR/mcx-template) | [MNX Market](https://github.com/RuanhoR/mnx)
 
 ## Use
 
 ### Client
 
-At vscode, download `mcx.language.support` plugin
+At vscode, download `ruanhor.mcx-vscode-client` plugin
 
 ### Cli
 
