@@ -182,9 +182,25 @@ export class MCXVirtualCode implements VirtualCode {
     const scriptLang = (scriptTag.arr?.lang ?? '').toString().toLowerCase()
     const isTypeScript = scriptLang === 'ts' || scriptLang === 'typescript'
 
+    type MCXCompileData = InstanceType<typeof mcx.compiler.MCXCompileData>
+    let compileData: MCXCompileData | undefined
+    try {
+      compileData = mcx.compiler.compileMCXFn(source)
+    } catch {
+      compileData = undefined
+    }
+
     const metadataSection = this.buildMetadataSection(tags)
-    const runtimeSection = this.buildRuntimeModelSection(source, isTypeScript)
-    const generated = scriptSource + metadataSection + runtimeSection
+    const validationSection = compileData
+      ? this.buildEventValidationSection(compileData)
+      : ''
+    const runtimeSection = this.buildRuntimeModelSection(
+      source,
+      isTypeScript,
+      compileData,
+    )
+    const generated =
+      scriptSource + metadataSection + validationSection + runtimeSection
 
     const mappings: CodeMapping[] = []
     if (scriptSource.length > 0) {
@@ -231,12 +247,13 @@ export class MCXVirtualCode implements VirtualCode {
   private buildRuntimeModelSection(
     source: string,
     isTypeScript: boolean,
+    compileData?: InstanceType<typeof mcx.compiler.MCXCompileData>,
   ): string {
     try {
-      const compileData = (mcx as any).compiler.compileMCXFn(source)
-      const runtimeType = this.resolveRuntimeType(compileData)
+      const data = compileData ?? mcx.compiler.compileMCXFn(source)
+      const runtimeType = this.resolveRuntimeType(data)
       const hasScriptDefaultExport = this.hasScriptDefaultExport(
-        compileData?.JSIR?.BuildCache?.export ?? [],
+        data?.JSIR?.BuildCache?.export ?? [],
       )
       const lines: string[] = [
         '',
@@ -246,7 +263,7 @@ export class MCXVirtualCode implements VirtualCode {
       let appData = '{}'
       let eventImports: ReturnType<typeof this.extractEventImports> = []
       if (runtimeType === 'app') {
-        eventImports = this.extractEventImports(compileData)
+        eventImports = this.extractEventImports(data)
         if (eventImports.length >= 1) {
           lines.push(...this.buildEventImportsSection(eventImports))
           appData = '__MCX_app_data'
@@ -254,16 +271,19 @@ export class MCXVirtualCode implements VirtualCode {
       }
 
       if (isTypeScript) {
-        const runtimeExportType =
-          this.getTypeScriptRuntimeExportType(runtimeType, eventImports.length >= 1)
+        const runtimeExportType = this.getTypeScriptRuntimeExportType(
+          runtimeType,
+          eventImports.length >= 1,
+        )
         lines.push(
           `type __MCX_runtime_type = ${JSON.stringify(runtimeType)};`,
           `type __MCX_runtime_export = ${runtimeExportType};`,
         )
 
-        const runtimeApp = runtimeType === 'app' && eventImports.length >= 1
-          ? '__MCX_app_data'
-          : '{}'
+        const runtimeApp =
+          runtimeType === 'app' && eventImports.length >= 1
+            ? '__MCX_app_data'
+            : '{}'
         lines.push(
           `const __MCX_runtime_default_export = null as unknown as __MCX_runtime_export & { app: ${runtimeApp} };`,
         )
@@ -287,7 +307,7 @@ export class MCXVirtualCode implements VirtualCode {
   }
 
   private extractEventImports(
-    compileData: any,
+    compileData: InstanceType<typeof mcx.compiler.MCXCompileData>,
   ): Array<{ type: 'default' | 'all'; as: string; source: string }> {
     const imports: Array<{
       type: 'default' | 'all'
@@ -334,7 +354,9 @@ export class MCXVirtualCode implements VirtualCode {
     lines.push(`type __MCX_event_imports = {`)
     for (const imp of eventImports) {
       if (imp.type === 'all') {
-        lines.push(`  ${imp.as}: { default: import("@mbler/mcx-types").Event },`)
+        lines.push(
+          `  ${imp.as}: { default: import("@mbler/mcx-types").Event },`,
+        )
       } else {
         lines.push(`  ${imp.as}: import("@mbler/mcx-types").Event ,`)
       }
@@ -349,23 +371,77 @@ export class MCXVirtualCode implements VirtualCode {
       const eventValues: string[] = []
 
       eventImports.forEach((imp, index) => {
+        const internalName = `__mcx_event_${index}`
         if (imp.type === 'all') {
-          varDeclarations.push(`const ${imp.as} = { default: __MCX_ctx.event[${index}] };`)
-          eventValues.push(`${imp.as}.default`)
+          varDeclarations.push(
+            `const ${internalName} = { default: __MCX_ctx.event[${index}] };`,
+          )
+          eventValues.push(`${internalName}.default`)
         } else {
-          varDeclarations.push(`const ${imp.as} = __MCX_ctx.event[${index}];`)
-          eventValues.push(imp.as)
+          varDeclarations.push(
+            `const ${internalName} = __MCX_ctx.event[${index}];`,
+          )
+          eventValues.push(internalName)
         }
       })
 
       lines.push(...varDeclarations)
-      lines.push(`const __MCX_app_data = { event: [${eventValues.join(', ')}] };`)
+      lines.push(
+        `const __MCX_app_data = { event: [${eventValues.join(', ')}] };`,
+      )
     }
 
     return lines
   }
 
-  private resolveRuntimeType(compileData: any): MCXRuntimeType {
+  private buildEventValidationSection(
+    compileData: InstanceType<typeof mcx.compiler.MCXCompileData>,
+  ): string {
+    const eventData = compileData?.strLoc?.Event
+    if (!eventData?.isLoad) return ''
+
+    const on = eventData.on
+    const subscribe = eventData.subscribe
+    const worldEventsProp = on === 'before' ? 'beforeEvents' : 'afterEvents'
+
+    const chunks: string[] = []
+    chunks.push('\n/* MCX event key validation */')
+    chunks.push('declare const __mcx_world: import("@minecraft/server").World;')
+
+    let extendsIndex = 0
+    for (const [key, value] of Object.entries(subscribe)) {
+      if (key === 'McxExtendsBy') {
+        for (const extFile of value.split(',').map(s => s.trim())) {
+          if (!extFile) continue
+          chunks.push(
+            `import __mcx_ext_${extendsIndex} from ${JSON.stringify(extFile)};`,
+          )
+          chunks.push(`void __mcx_ext_${extendsIndex};`)
+          extendsIndex++
+        }
+        continue
+      }
+
+      const eventName = this.extractWorldEventName(key)
+      if (!eventName) continue
+      chunks.push(`void __mcx_world.${worldEventsProp}.${eventName};`)
+    }
+
+    if (chunks.length <= 2) return ''
+
+    return `\n${chunks.join('\n')}\n`
+  }
+
+  private extractWorldEventName(key: string): string | null {
+    if (/^(?:[$_a-zA-Z][$_a-zA-Z0-9]*)$/.test(key)) {
+      return key
+    }
+    return null
+  }
+
+  private resolveRuntimeType(
+    compileData: InstanceType<typeof mcx.compiler.MCXCompileData>,
+  ): MCXRuntimeType {
     let type: MCXRuntimeType = 'app'
 
     if (compileData?.strLoc?.Event?.isLoad) {
@@ -381,20 +457,23 @@ export class MCXVirtualCode implements VirtualCode {
     return type
   }
 
-  private getTypeScriptRuntimeExportType(runtimeType: MCXRuntimeType, hasEventImports: boolean = false): string {
+  private getTypeScriptRuntimeExportType(
+    runtimeType: MCXRuntimeType,
+    hasEventImports: boolean = false,
+  ): string {
     if (runtimeType === 'app') {
       if (hasEventImports) {
-        return '{ type: "app"; setup: (ctx: import("@mbler/mcx-types").MCXCtx) => any; app: { event: import("@mbler/mcx-types").Event[] } }'
+        return 'Omit<typeof import("@mbler/mcx").types.MCXFile<"app">, "app">'
       }
-      return 'Parameters<typeof import("@mbler/mcx").createApp>[0]'
+      return 'typeof import("@mbler/mcx").types.MCXFile<"app">'
     }
     if (runtimeType === 'event') {
       return 'InstanceType<typeof import("@mbler/mcx").Event>'
     }
     if (runtimeType === 'ui') {
-      return 'InstanceType<typeof import("@mbler/mcx").ui>'
+      return 'typeof import("@mbler/mcx").types.MCXFile<"ui">'
     }
-    return '{ type: "component"; setup: null; app: Record<string, unknown> }'
+    return 'typeof import("@mbler/mcx").types.MCXFile<"component">'
   }
 
   private hasScriptDefaultExport(exportNodes: any[]): boolean {
