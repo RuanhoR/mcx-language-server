@@ -1,6 +1,6 @@
 {
   "name": "mcx-vscode-client",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Lanuage support for MCX language.",
   "publisher": "ruanhor",
   "license": "MIT",
@@ -79,7 +79,7 @@
   },
   "dependencies": {
     "@mbler/mcx-core": "^0.0.5",
-    "@mbler/mcx-server": "^0.1.1-beta.r20260508.5",
+    "@mbler/mcx-server": "^0.1.1-rc.1",
     "@mbler/mcx-ts-plugin": "0.1.1-alpha.r20260521.1",
     "@types/vscode": "^1.115.0",
     "@volar/vscode": "^2.4.28",

@@ -1,1 +1,1 @@
-export { createMCXLanguagePlugin } from "../plugin/index.js";
+export { createMCXLanguagePlugin } from '../plugin/index.js'
