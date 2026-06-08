@@ -24,6 +24,12 @@
     "typescript": "5.9.3",
     "vitest": "^4.1.8"
   },
+  "simple-git-hooks": {
+    "config": ".simple-git-hooks.mjs"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["simple-git-hooks"]
+  },
   "dependencies": {
     "@mbler/mcx-core": "0.0.5",
     "@volar/language-core": "^2.4.28",
