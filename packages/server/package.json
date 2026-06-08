@@ -28,7 +28,7 @@
   },
   "scripts": {
     "build": "rollup -c",
-    "test": "pnpm build && cd test && pnpm test"
+    "test": "vitest run"
   },
   "dependencies": {
     "@mbler/mcx-core": "^0.0.5",
