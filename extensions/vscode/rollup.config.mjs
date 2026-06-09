@@ -40,6 +40,6 @@ export default {
     /@mbler\/mcx-core/,
     "semver",
     /@mbler\/mcx-server/,
-    "@mbler/ts-plugin"
+    /@mbler\/mcx-ts-plugin/
   ]
 };

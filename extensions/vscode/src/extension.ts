@@ -154,7 +154,7 @@ async function ensureMCXLanguage(document: TextDocument): Promise<void> {
     try {
       await languages.setTextDocumentLanguage(document, 'mcx')
     } catch {
-      // noop
+      // not a plaintext document
     }
   }
 }

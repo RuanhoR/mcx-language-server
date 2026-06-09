@@ -1,7 +1,7 @@
 {
   "name": "mcx-vscode-client",
   "version": "1.0.4",
-  "description": "Lanuage support for MCX language.",
+  "description": "Language support for MCX language.",
   "publisher": "ruanhor",
   "license": "MIT",
   "author": {
@@ -42,7 +42,7 @@
     "commands": [
       {
         "command": "mcx.restart.language",
-        "title": "MCX: Restart Lanuage Server",
+        "title": "MCX: Restart Language Server",
         "category": "MCX"
       }
     ],

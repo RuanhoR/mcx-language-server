@@ -3,6 +3,9 @@
   "version": "0.1.1-alpha.r20260521.1",
   "description": "TypeScript server plugin for MCX",
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "author": "ruanhor",
   "type": "commonjs",
   "main": "dist/index.js",
