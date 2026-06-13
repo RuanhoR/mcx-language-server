@@ -145,6 +145,11 @@ export function createMCXLanguagePlugin(
           isMixedContent: true,
           scriptKind: tsModule.ScriptKind.Deferred,
         },
+        { extension: 'png', isMixedContent: false, scriptKind: tsModule.ScriptKind.External },
+        { extension: 'svg', isMixedContent: false, scriptKind: tsModule.ScriptKind.External },
+        { extension: 'jpg', isMixedContent: false, scriptKind: tsModule.ScriptKind.External },
+        { extension: 'jpeg', isMixedContent: false, scriptKind: tsModule.ScriptKind.External },
+        { extension: 'gif', isMixedContent: false, scriptKind: tsModule.ScriptKind.External },
       ],
       getServiceScript(
         virtualCode: VirtualCode,

@@ -34,7 +34,8 @@
     "onlyBuiltDependencies": ["simple-git-hooks"]
   },
   "dependencies": {
-    "@mbler/mcx-core": "0.0.5",
+    "@mbler/mcx-core": "^0.1.1",
+    "@mbler/mcx-types": "^0.0.4-rc.1",
     "@volar/language-core": "^2.4.28",
     "vscode-uri": "^3.1.0"
   }

@@ -463,17 +463,17 @@ export class MCXVirtualCode implements VirtualCode {
   ): string {
     if (runtimeType === 'app') {
       if (hasEventImports) {
-        return 'Omit<typeof import("@mbler/mcx").types.MCXFile<"app">, "app">'
+        return 'Omit<import("@mbler/mcx-types").MCXFile<"app">, "app">'
       }
-      return 'typeof import("@mbler/mcx").types.MCXFile<"app">'
+      return 'import("@mbler/mcx-types").MCXFile<"app">'
     }
     if (runtimeType === 'event') {
       return 'InstanceType<typeof import("@mbler/mcx").Event>'
     }
     if (runtimeType === 'ui') {
-      return 'typeof import("@mbler/mcx").types.MCXFile<"ui">'
+      return 'import("@mbler/mcx-types").MCXFile<"ui">'
     }
-    return 'typeof import("@mbler/mcx").types.MCXFile<"component">'
+    return 'import("@mbler/mcx-types").MCXFile<"component">'
   }
 
   private hasScriptDefaultExport(exportNodes: any[]): boolean {
