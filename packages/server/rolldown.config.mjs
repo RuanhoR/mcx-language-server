@@ -1,12 +1,6 @@
-import commonjs from '@rollup/plugin-commonjs'
-import resolve from '@rollup/plugin-node-resolve'
-import tsPlugin from '@rollup/plugin-typescript'
-
-const sharedPlugins = [
-  commonjs(),
-  resolve({ preferBuiltins: true }),
-  tsPlugin({ tsconfig: './tsconfig.json' }),
-]
+// @ts-check
+import { defineConfig } from "rolldown"
+import { dts } from "rolldown-plugin-dts"
 function createRegex(...a) {
   return a.map(i => new RegExp(i + '.+'))
 }
@@ -28,34 +22,39 @@ const external = [
   '@volar/language-server/lib/fileSystemProviders/node.js',
   '@volar/language-server/lib/project/typescriptProject.js'
 ]
-
-export default [
+const sharedPlugins = [
+  dts()
+]
+export default defineConfig([
   {
     input: './src/index.ts',
-    output: [
-      {
-        file: './dist/index.js',
-        format: 'esm',
-        sourcemap: true,
-      },
-      {
-        file: './dist/index.cjs',
-        format: 'cjs',
-        sourcemap: true,
-        exports: 'named',
-      },
-    ],
-    external,
-    plugins: sharedPlugins,
-  },
-  {
-    input: './src/server.ts',
     output: {
-      file: './dist/server.js',
+      dir: './dist',
       format: 'esm',
       sourcemap: true,
     },
     external,
     plugins: sharedPlugins,
   },
-]
+  {
+    input: './src/index.ts',
+    output: {
+      dir: './dist',
+      entryFileNames: '[name].cjs',
+      format: 'cjs',
+      sourcemap: true,
+      exports: 'named',
+    },
+    external,
+  },
+  {
+    input: './src/server.ts',
+    output: {
+      dir: './dist',
+      format: 'esm',
+      sourcemap: true,
+    },
+    external,
+    plugins: sharedPlugins,
+  },
+])

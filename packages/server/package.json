@@ -1,6 +1,6 @@
 {
   "name": "@mbler/mcx-server",
-  "version": "0.1.1-rc.3",
+  "version": "0.1.1-rc.4",
   "description": "MCX Language Server",
   "engines": {
     "node": ">=20"
@@ -30,7 +30,7 @@
     }
   },
   "scripts": {
-    "build": "rollup -c",
+    "build": "rolldown -c",
     "test": "vitest run"
   },
   "dependencies": {
