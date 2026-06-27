@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@mbler/mcx": "0.0.3-alpha.r1",
-    "@mbler/mcx-core": "^0.1.1",
+    "@mbler/mcx-core": "^0.1.2-rc.8",
     "@mbler/mcx-types": "^0.0.4-rc.1",
     "@volar/language-core": "^2.4.28",
     "@volar/language-server": "^2.4.28",
@@ -44,6 +44,6 @@
     "vscode-languageserver": "^9.0.1"
   },
   "bin": {
-    "mcx-language-server": "./bin/mcx-server.js"
+    "mcx-language-server": "bin/mcx-server.js"
   }
 }
