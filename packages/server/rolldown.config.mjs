@@ -16,6 +16,7 @@ const external = [
     '@volar/language-service',
     'typescript-auto-import-cache'
   ),
+  "@mbler/mcx-core",
   'fs',
   'semver',
   '@volar/language-server/lib/fileSystemProviders/http.js',
@@ -25,6 +26,10 @@ const external = [
 const sharedPlugins = [
   dts()
 ]
+const pathMapping = {
+  '@mbler/mcx-core': '@mbler/mcx-core',
+}
+
 export default defineConfig([
   {
     input: './src/index.ts',
@@ -32,6 +37,7 @@ export default defineConfig([
       dir: './dist',
       format: 'esm',
       sourcemap: true,
+      paths: pathMapping,
     },
     external,
     plugins: sharedPlugins,
@@ -44,6 +50,7 @@ export default defineConfig([
       format: 'cjs',
       sourcemap: true,
       exports: 'named',
+      paths: pathMapping,
     },
     external,
   },
