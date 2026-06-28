@@ -1,6 +1,6 @@
 {
   "name": "@mbler/mcx-server",
-  "version": "0.1.2-rc.1",
+  "version": "0.1.2-rc.2",
   "description": "MCX Language Server",
   "engines": {
     "node": ">=20"
