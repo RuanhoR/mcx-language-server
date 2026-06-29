@@ -41,7 +41,10 @@ export function createMCXLanguageClient(context: ExtensionContext): LanguageClie
     ],
     middleware: volarMiddleware,
     synchronize: {
-      fileEvents: workspace.createFileSystemWatcher("**/*.mcx"),
+      fileEvents: [
+        workspace.createFileSystemWatcher("**/*.mcx"),
+        workspace.createFileSystemWatcher("**/*.ts"),
+      ],
     },
   };
 

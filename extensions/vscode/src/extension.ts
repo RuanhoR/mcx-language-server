@@ -21,8 +21,8 @@ import type { LanguageClient } from 'vscode-languageclient/node.js'
 import { createMCXLanguageClient } from './client/index.js'
 import { formatMCXDocument } from './format/index.js'
 
-type MCXPosition = mcx.PUBTYPE.MCXPosition
-type MCXTagNode = mcx.PUBTYPE.ParsedTagNode
+type MCXPosition = mcx.PubType.MCXPosition
+type MCXTagNode = mcx.PubType.ParsedTagNode
 
 const TAG_COMPLETIONS = ['script', 'Event', 'Component', 'Ui']
 const COMMON_ATTRIBUTES = ['id', 'lang', '@before', '@after']
@@ -99,6 +99,15 @@ export function activate(context: ExtensionContext): void {
     dispose: () => {
       void client?.stop()
     },
+  })
+
+  workspace.onDidSaveTextDocument(document => {
+    if (document.languageId === 'mcx' || document.uri.fsPath.endsWith('.mcx')) {
+      commands.executeCommand('typescript.reloadProjects').then(
+        () => { /* success */ },
+        () => { /* command may not exist */ },
+      )
+    }
   })
 }
 
