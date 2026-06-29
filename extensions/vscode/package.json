@@ -1,6 +1,6 @@
 {
   "name": "mcx-vscode-client",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Language support for MCX language.",
   "publisher": "ruanhor",
   "license": "MIT",

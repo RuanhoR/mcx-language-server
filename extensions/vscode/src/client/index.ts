@@ -40,6 +40,7 @@ export function createMCXLanguageClient(context: ExtensionContext): LanguageClie
       { pattern: "**/*.mcx" },
       { language: "typescript" },
       { language: "javascript" },
+      { language: "json" },
     ],
     middleware: volarMiddleware,
     synchronize: {
