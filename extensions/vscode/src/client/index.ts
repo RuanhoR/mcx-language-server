@@ -38,9 +38,6 @@ export function createMCXLanguageClient(context: ExtensionContext): LanguageClie
     documentSelector: [
       { language: "mcx" },
       { pattern: "**/*.mcx" },
-      { language: "typescript" },
-      { language: "javascript" },
-      { language: "json" },
     ],
     middleware: volarMiddleware,
     synchronize: {

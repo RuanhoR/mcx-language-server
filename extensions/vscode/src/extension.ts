@@ -101,8 +101,20 @@ export function activate(context: ExtensionContext): void {
     },
   })
 
+  let tsChangeTimer: ReturnType<typeof setTimeout> | undefined
+  workspace.onDidChangeTextDocument(event => {
+    if (event.document.languageId !== 'typescript' && event.document.languageId !== 'javascript') return
+    if (!client) return
+    if (tsChangeTimer) clearTimeout(tsChangeTimer)
+    tsChangeTimer = setTimeout(() => {
+      client?.sendNotification('workspace/didChangeWatchedFiles', {
+        changes: [{ uri: event.document.uri.toString(), type: 2 }],
+      })
+    }, 500)
+  })
+
   workspace.onDidSaveTextDocument(document => {
-    if (document.languageId === 'mcx' || document.uri.fsPath.endsWith('.mcx')) {
+    if (document.languageId === 'mcx') {
       commands.executeCommand('typescript.reloadProjects').then(
         () => { /* success */ },
         () => { /* command may not exist */ },
