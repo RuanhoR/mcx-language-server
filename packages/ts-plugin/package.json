@@ -1,6 +1,6 @@
 {
   "name": "@mbler/mcx-ts-plugin",
-  "version": "0.1.2-rc.1",
+  "version": "0.1.2-rc.2",
   "description": "TypeScript server plugin for MCX",
   "license": "MIT",
   "engines": {

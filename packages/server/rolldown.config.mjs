@@ -7,7 +7,7 @@ function createRegex(...a) {
 const external = [
   /^node:/,
   ...createRegex(
-    'typescript',
+    'typescript/',
     '@volar/language-core',
     '@volar/language-server',
     'vscode-languageserver',
@@ -16,6 +16,8 @@ const external = [
     '@volar/language-service',
     'typescript-auto-import-cache'
   ),
+  'typescript',
+  'volar-service-typescript',
   "@mbler/mcx-core",
   'fs',
   'semver',

@@ -81,8 +81,8 @@
   },
   "dependencies": {
     "@mbler/mcx-core": "^0.1.2-rc.10",
-    "@mbler/mcx-server": "^0.1.2-rc.2",
-    "@mbler/mcx-ts-plugin": "^0.1.2-rc.1",
+    "@mbler/mcx-server": "^0.1.2-rc.3",
+    "@mbler/mcx-ts-plugin": "^0.1.2-rc.2",
     "@types/vscode": "^1.115.0",
     "@volar/vscode": "^2.4.28",
     "vscode-languageclient": "^9.0.1"
