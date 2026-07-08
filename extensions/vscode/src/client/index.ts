@@ -43,6 +43,8 @@ export function createMCXLanguageClient(context: ExtensionContext): LanguageClie
     synchronize: {
       fileEvents: [
         workspace.createFileSystemWatcher("**/*.mcx"),
+        workspace.createFileSystemWatcher("**/*.ts"),
+        workspace.createFileSystemWatcher("**/*.js"),
       ],
     },
   };
