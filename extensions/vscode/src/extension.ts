@@ -1,7 +1,11 @@
 import {
+  CancellationToken,
   CompletionItem,
   CompletionItemKind,
+  Definition,
+  DefinitionLink,
   Hover,
+  Location,
   MarkdownString,
   Position,
   Range,
@@ -11,6 +15,7 @@ import {
   window,
   workspace,
   type CompletionItemProvider,
+  type DefinitionProvider,
   type DocumentFormattingEditProvider,
   type ExtensionContext,
   type HoverProvider,
@@ -25,10 +30,38 @@ type MCXPosition = mcx.PubType.MCXPosition
 type MCXTagNode = mcx.PubType.ParsedTagNode
 
 const TAG_COMPLETIONS = ['script', 'Event', 'Component', 'Ui']
-const COMMON_ATTRIBUTES = ['id', 'lang', '@before', '@after']
 const SCRIPT_LANG_VALUES = ['ts', 'js']
+const UI_LAYOUT_TYPES = ['input', 'dropdown', 'submit', 'toggle', 'slider', 'button-m', 'button', 'divider', 'title', 'body']
+const COMPONENT_PARENT_TAGS = ['items', 'blocks', 'entities']
+const COMPONENT_CHILD_TAGS = ['item', 'block', 'entity']
 const TS_PLUGIN_ID = '@mbler/mcx-ts-plugin'
 let client: LanguageClient | undefined
+
+const astCache = new Map<string, { tags: MCXTagNode[]; compileData: any; timestamp: number }>()
+const AST_CACHE_TTL = 500
+
+function getCachedAST(source: string): { tags: MCXTagNode[]; compileData: any } {
+  const cached = astCache.get(source)
+  const now = Date.now()
+  if (cached && now - cached.timestamp < AST_CACHE_TTL) {
+    return cached
+  }
+  let tags: MCXTagNode[] = []
+  let compileData: any = undefined
+  try {
+    tags = new (mcx as any).AST.tag(source).parseAST() as MCXTagNode[]
+  } catch {}
+  try {
+    compileData = (mcx as any).compiler.compileMCXFn(source)
+  } catch {}
+  const result = { tags, compileData }
+  astCache.set(source, { ...result, timestamp: now })
+  if (astCache.size > 50) {
+    const oldest = [...astCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)[0]
+    if (oldest) astCache.delete(oldest[0])
+  }
+  return result
+}
 
 export function activate(context: ExtensionContext): void {
   client = createMCXLanguageClient(context)
@@ -59,6 +92,7 @@ export function activate(context: ExtensionContext): void {
       { language: 'mcx' },
       completionProvider,
       '<',
+      '/',
       ' ',
       ':',
       '@',
@@ -76,6 +110,19 @@ export function activate(context: ExtensionContext): void {
 
   context.subscriptions.push(
     languages.registerHoverProvider({ language: 'mcx' }, hoverProvider),
+  )
+
+  const definitionProvider: DefinitionProvider = {
+    provideDefinition(document, position, token) {
+      return provideMCXDefinition(document, position, token)
+    },
+  }
+
+  context.subscriptions.push(
+    languages.registerDefinitionProvider(
+      { language: 'mcx' },
+      definitionProvider,
+    ),
   )
 
   const openDisposable = workspace.onDidOpenTextDocument(doc => {
@@ -101,24 +148,11 @@ export function activate(context: ExtensionContext): void {
     },
   })
 
-  let tsChangeTimer: ReturnType<typeof setTimeout> | undefined
-  workspace.onDidChangeTextDocument(event => {
-    if (event.document.languageId !== 'typescript' && event.document.languageId !== 'javascript') return
-    if (!client) return
-    if (tsChangeTimer) clearTimeout(tsChangeTimer)
-    tsChangeTimer = setTimeout(() => {
-      client?.sendNotification('workspace/didChangeWatchedFiles', {
-        changes: [{ uri: event.document.uri.toString(), type: 2 }],
-      })
-    }, 500)
-  })
-
   workspace.onDidSaveTextDocument(document => {
-    if (document.languageId === 'mcx') {
-      commands.executeCommand('typescript.reloadProjects').then(
-        () => { /* success */ },
-        () => { /* command may not exist */ },
-      )
+    if (document.languageId === 'mcx' || document.languageId === 'typescript' || document.languageId === 'javascript') {
+      client?.sendNotification('workspace/didChangeWatchedFiles', {
+        changes: [{ uri: document.uri.toString(), type: 2 }],
+      })
     }
   })
 }
@@ -180,6 +214,63 @@ async function ensureMCXLanguage(document: TextDocument): Promise<void> {
   }
 }
 
+function getParentTagContext(
+  document: TextDocument,
+  position: Position,
+): string | undefined {
+  const source = document.getText()
+  const offset = document.offsetAt(position)
+  const beforeCursor = source.slice(0, offset)
+  const tags = beforeCursor.match(/<([A-Za-z][\w:-]*)[^>]*>/g)
+  if (!tags) return undefined
+  const openStack: string[] = []
+  for (const tag of tags) {
+    if (tag.startsWith('</')) {
+      const name = tag.match(/<\/([\w:-]+)/)?.[1]
+      if (name && openStack.length > 0 && openStack[openStack.length - 1] === name) {
+        openStack.pop()
+      }
+    } else if (!tag.endsWith('/>')) {
+      const name = tag.match(/<([\w:-]+)/)?.[1]
+      if (name) openStack.push(name)
+    }
+  }
+  return openStack.length > 0 ? openStack[openStack.length - 1] : undefined
+}
+
+function getChildTagCompletions(parentTag: string): string[] {
+  switch (parentTag) {
+    case 'Component':
+      return COMPONENT_PARENT_TAGS
+    case 'items':
+      return ['item']
+    case 'blocks':
+      return ['block']
+    case 'entities':
+      return ['entity']
+    case 'Ui':
+      return UI_LAYOUT_TYPES
+    default:
+      return TAG_COMPLETIONS
+  }
+}
+
+function getOpenTagStack(source: string): string[] {
+  const stack: string[] = []
+  const tagRegex = /<\/?([A-Za-z][\w:-]*)[^>]*>/g
+  let match: RegExpExecArray | null
+  while ((match = tagRegex.exec(source)) !== null) {
+    if (match[0].startsWith('</')) {
+      if (stack.length > 0 && stack[stack.length - 1] === match[1]) {
+        stack.pop()
+      }
+    } else if (!match[0].endsWith('/>')) {
+      stack.push(match[1])
+    }
+  }
+  return stack
+}
+
 function provideMCXCompletions(
   document: TextDocument,
   position: Position,
@@ -189,10 +280,26 @@ function provideMCXCompletions(
     .text.slice(0, position.character)
   const fullLine = document.lineAt(position.line).text
 
+  if (/<\/[A-Za-z:_-]*$/.test(linePrefix)) {
+    const openTags = getOpenTagStack(document.getText())
+    if (openTags.length === 0) return []
+    const lastOpen = openTags[openTags.length - 1]
+    const item = new CompletionItem(lastOpen, CompletionItemKind.Keyword)
+    item.insertText = lastOpen + '>'
+    item.detail = 'Close tag'
+    item.filterText = lastOpen
+    return [item]
+  }
+
   if (/<[A-Za-z:_-]*$/.test(linePrefix)) {
-    return TAG_COMPLETIONS.map(name => {
+    const parentContext = getParentTagContext(document, position)
+    const suggestions = parentContext
+      ? getChildTagCompletions(parentContext)
+      : TAG_COMPLETIONS
+    return suggestions.map(name => {
       const item = new CompletionItem(name, CompletionItemKind.Keyword)
       item.insertText = name
+      item.detail = parentContext ? `${parentContext} child` : 'MCX tag'
       return item
     })
   }
@@ -215,28 +322,74 @@ function provideMCXCompletions(
     scriptBlock &&
     isInsideScriptBlockContent(document, position, scriptBlock)
   ) {
-    return provideScriptCompletions(fullLine, position, linePrefix)
+    return provideScriptCompletions(document, position, fullLine, linePrefix)
   }
 
   const tagName = currentTagName(linePrefix)
-  const attrs =
-    tagName === 'script' ? [...COMMON_ATTRIBUTES, 'lang'] : COMMON_ATTRIBUTES
+  if (!tagName) return []
 
-  return [...new Set(attrs)].map(attr => {
-    const item = new CompletionItem(attr, CompletionItemKind.Property)
-    if (attr === 'lang' && tagName === 'script') {
-      item.insertText = 'lang="ts"'
-      item.detail = 'script language (ts/js)'
-    } else {
-      item.insertText = attr
-    }
-    return item
-  })
+  return getAttributeCompletions(tagName, linePrefix)
+}
+
+function getAttributeCompletions(tagName: string, linePrefix: string): CompletionItem[] {
+  const items: CompletionItem[] = []
+  const existingAttrMatch = linePrefix.match(/\s([\w@:-]+)/g)
+  const existingAttrs = new Set(
+    existingAttrMatch?.map(a => a.trim()) ?? [],
+  )
+
+  function addAttr(name: string, detail: string, insertText?: string) {
+    if (existingAttrs.has(name)) return
+    const item = new CompletionItem(name, CompletionItemKind.Property)
+    item.detail = detail
+    if (insertText) item.insertText = insertText
+    items.push(item)
+  }
+
+  addAttr('id', 'Unique identifier')
+
+  if (tagName === 'script') {
+    addAttr('lang', 'Script language', 'lang="ts"')
+    addAttr('@before', 'Execute before main logic')
+    addAttr('@after', 'Execute after main logic')
+  } else if (tagName === 'Event') {
+    addAttr('@before', 'Listen on beforeEvents')
+    addAttr('@after', 'Listen on afterEvents')
+  } else if (tagName === 'Ui') {
+    addAttr('id', 'UI identifier')
+  } else if (tagName === 'Component') {
+    addAttr('id', 'Component identifier')
+  } else if (COMPONENT_PARENT_TAGS.includes(tagName)) {
+    addAttr('@before', 'Execute before main logic')
+    addAttr('@after', 'Execute after main logic')
+  } else if (COMPONENT_CHILD_TAGS.includes(tagName)) {
+    addAttr('id', 'Component item identifier')
+    addAttr('@before', 'Execute before main logic')
+    addAttr('@after', 'Execute after main logic')
+  } else if (UI_LAYOUT_TYPES.includes(tagName)) {
+    addAttr('content', 'UI element content')
+    addAttr('click', 'Click handler')
+    addAttr('img', 'Button image path')
+    addAttr('default', 'Default value')
+    addAttr('option', 'Dropdown options (comma-separated)')
+    addAttr('min', 'Slider minimum value')
+    addAttr('max', 'Slider maximum value')
+    addAttr('placeholderText', 'Input placeholder text')
+    addAttr('tip', 'Tooltip text')
+    addAttr('for', 'For loop expression (e.g. "item in items")')
+    addAttr('if', 'Conditional expression')
+  } else {
+    addAttr('@before', 'Execute before main logic')
+    addAttr('@after', 'Execute after main logic')
+  }
+
+  return items
 }
 
 function provideScriptCompletions(
-  fullLine: string,
+  document: TextDocument,
   position: Position,
+  fullLine: string,
   linePrefix: string,
 ): CompletionItem[] {
   const completions: CompletionItem[] = []
@@ -260,25 +413,17 @@ function provideScriptCompletions(
   }
 
   if (/\.subscribe\(?["']?$/.test(linePrefix.trim())) {
-    const minecraftEvents = [
-      'playerJoin',
-      'playerLeave',
-      'playerDie',
-      'playerRespawn',
-      'blockBreak',
-      'blockPlace',
-      'itemUse',
-      'itemUseOn',
-      'entityHit',
-      'entityDie',
-      'projectileHit',
-      'weatherChange',
-      'timeChange',
-    ]
-    for (const evt of minecraftEvents) {
-      const item = new CompletionItem(evt, CompletionItemKind.Event)
-      item.detail = 'Minecraft event'
-      completions.push(item)
+    const source = document.getText()
+    const { tags } = getCachedAST(source)
+    const eventTag = tags.find(t => t.name === 'Event')
+    if (eventTag) {
+      const eventOn = typeof eventTag.arr['@before'] === 'string' ? 'before' : 'after'
+      const events = getMinecraftEvents(eventOn)
+      for (const evt of events) {
+        const item = new CompletionItem(evt, CompletionItemKind.Event)
+        item.detail = `Minecraft ${eventOn} event`
+        completions.push(item)
+      }
     }
   }
 
@@ -292,6 +437,77 @@ function provideScriptCompletions(
   }
 
   return completions
+}
+
+let minecraftEventsCache: { after: string[]; before: string[] } | null = null
+
+function getMinecraftEvents(on: 'after' | 'before'): string[] {
+  if (minecraftEventsCache) {
+    return on === 'after' ? minecraftEventsCache.after : minecraftEventsCache.before
+  }
+
+  const knownAfterEvents = [
+    'playerJoin', 'playerLeave', 'playerDie', 'playerRespawn',
+    'blockBreak', 'blockPlace', 'itemUse', 'itemUseOn',
+    'entityHit', 'entityDie', 'projectileHit',
+    'weatherChange', 'timeChange',
+  ]
+
+  const knownBeforeEvents = [
+    'itemUse', 'itemUseOn', 'blockBreak', 'blockPlace',
+  ]
+
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    const workspaceFolders = workspace.workspaceFolders
+    if (workspaceFolders && workspaceFolders.length > 0) {
+      const rootPath = workspaceFolders[0].uri.fsPath
+      const searchPaths = [
+        path.join(rootPath, 'node_modules', '@minecraft', 'server'),
+        path.join(rootPath, 'scripts', 'node_modules', '@minecraft', 'server'),
+      ]
+      for (const p of searchPaths) {
+        const dtsPath = path.join(p, 'index.d.ts')
+        if (fs.existsSync(dtsPath)) {
+          const content = fs.readFileSync(dtsPath, 'utf-8')
+          const afterMatch = content.match(/interface WorldAfterEvents\s*\{([^}]+)\}/)
+          const beforeMatch = content.match(/interface WorldBeforeEvents\s*\{([^}]+)\}/)
+          if (afterMatch) {
+            minecraftEventsCache = {
+              after: extractPropertyNames(afterMatch[1]),
+              before: beforeMatch ? extractPropertyNames(beforeMatch[1]) : knownBeforeEvents,
+            }
+            return on === 'after' ? minecraftEventsCache.after : minecraftEventsCache.before
+          }
+        }
+      }
+    }
+  } catch {}
+
+  minecraftEventsCache = { after: knownAfterEvents, before: knownBeforeEvents }
+  return on === 'after' ? knownAfterEvents : knownBeforeEvents
+}
+
+function extractPropertyNames(body: string): string[] {
+  const names: string[] = []
+  const regex = /\b(\w+)\s*:\s*(.+?);/g
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(body)) !== null) {
+    if (!match[1].startsWith('readonly') && match[1] !== '') {
+      names.push(match[1])
+    }
+  }
+  if (names.length === 0) {
+    const simpleMatch = body.match(/\b(\w+)\s*:/g)
+    if (simpleMatch) {
+      for (const m of simpleMatch) {
+        const name = m.replace(/\s*:/, '').trim()
+        if (name) names.push(name)
+      }
+    }
+  }
+  return names
 }
 
 function provideMCXHover(
@@ -314,79 +530,23 @@ function provideMCXHover(
     markdown.appendCodeblock(hoverInfo.tagName, 'xml')
     markdown.appendMarkdown('\n\n**MCX Tag**\n\n')
 
-    if (hoverInfo.tagName === 'script') {
-      markdown.appendMarkdown(
-        'Script block for embedded TypeScript/JavaScript code.\n\n',
-      )
-      markdown.appendMarkdown(
-        '**Attributes:** `lang`, `id`, `@before`, `@after`\n',
-      )
-      markdown.appendMarkdown('**Languages:** `ts`, `js`')
-    } else if (hoverInfo.tagName === 'Event') {
-      markdown.appendMarkdown(
-        'Event definition block for Minecraft event handlers.\n\n',
-      )
-      markdown.appendMarkdown(
-        'Defines event-driven behavior using Minecraft events.\n\n',
-      )
-      markdown.appendMarkdown('**Attributes:** `id`\n\n')
-      markdown.appendMarkdown(
-        '**Contents:** Subscribe to events with `subscribe("eventName", handler)` and manage event lifecycle.',
-      )
-    } else if (hoverInfo.tagName === 'Component') {
-      markdown.appendMarkdown('Component definition block.\n\n')
-      markdown.appendMarkdown(
-        'Defines a reusable component with custom items, blocks, and entities.\n\n',
-      )
-      markdown.appendMarkdown('**Attributes:** `id`\n\n')
-      markdown.appendMarkdown(
-        '**Children:** `<items>`, `<blocks>`, `<entities>`',
-      )
-    } else if (hoverInfo.tagName === 'Ui') {
-      markdown.appendMarkdown('UI definition block.\n\n')
-      markdown.appendMarkdown(
-        'Defines a custom UI layout and behavior for Minecraft.\n\n',
-      )
-      markdown.appendMarkdown('**Attributes:** `id`')
-    } else if (hoverInfo.tagName === 'items') {
-      markdown.appendMarkdown('Item definitions container.\n\n')
-      markdown.appendMarkdown(
-        'Wraps one or more `<item>` definitions in a Component.\n\n',
-      )
-      markdown.appendMarkdown('Common attributes: `id`, `@before`, `@after`')
-    } else if (hoverInfo.tagName === 'blocks') {
-      markdown.appendMarkdown('Block definitions container.\n\n')
-      markdown.appendMarkdown(
-        'Wraps one or more `<block>` definitions in a Component.\n\n',
-      )
-      markdown.appendMarkdown('Common attributes: `id`, `@before`, `@after`')
-    } else if (hoverInfo.tagName === 'entities') {
-      markdown.appendMarkdown('Entity definitions container.\n\n')
-      markdown.appendMarkdown(
-        'Wraps one or more `<entity>` definitions in a Component.\n\n',
-      )
-      markdown.appendMarkdown('Common attributes: `id`, `@before`, `@after`')
-    } else if (hoverInfo.tagName === 'item') {
-      markdown.appendMarkdown('Custom item definition.\n\n')
-      markdown.appendMarkdown(
-        'Defines a custom Minecraft item with properties.\n\n',
-      )
-      markdown.appendMarkdown('Common attributes: `id`, `@before`, `@after`')
-    } else if (hoverInfo.tagName === 'block') {
-      markdown.appendMarkdown('Custom block definition.\n\n')
-      markdown.appendMarkdown(
-        'Defines a custom Minecraft block with properties.\n\n',
-      )
-      markdown.appendMarkdown('Common attributes: `id`, `@before`, `@after`')
-    } else if (hoverInfo.tagName === 'entity') {
-      markdown.appendMarkdown('Custom entity definition.\n\n')
-      markdown.appendMarkdown(
-        'Defines a custom Minecraft entity with properties.\n\n',
-      )
-      markdown.appendMarkdown('Common attributes: `id`, `@before`, `@after`')
+    const tagDocs: Record<string, string> = {
+      script: 'Script block for embedded TypeScript/JavaScript code.\n\n**Attributes:** `lang`, `id`, `@before`, `@after`\n**Languages:** `ts`, `js`',
+      Event: 'Event definition block for Minecraft event handlers.\n\nDefines event-driven behavior using Minecraft events.\n\n**Attributes:** `id`, `@before`, `@after`\n\n**Contents:** Subscribe to events with `subscribe("eventName", handler)`.',
+      Component: 'Component definition block.\n\nDefines a reusable component with custom items, blocks, and entities.\n\n**Attributes:** `id`\n\n**Children:** `<items>`, `<blocks>`, `<entities>`',
+      Ui: 'UI definition block.\n\nDefines a custom UI layout for Minecraft.\n\n**Attributes:** `id`\n\n**Children:** `input`, `dropdown`, `submit`, `toggle`, `slider`, `button`, `button-m`, `divider`, `title`, `body`',
+      items: 'Item definitions container.\n\nWraps one or more `<item>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
+      blocks: 'Block definitions container.\n\nWraps one or more `<block>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
+      entities: 'Entity definitions container.\n\nWraps one or more `<entity>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
+      item: 'Custom item definition.\n\nDefines a custom Minecraft item with properties.\n\n**Attributes:** `id`, `@before`, `@after`',
+      block: 'Custom block definition.\n\nDefines a custom Minecraft block with properties.\n\n**Attributes:** `id`, `@before`, `@after`',
+      entity: 'Custom entity definition.\n\nDefines a custom Minecraft entity with properties.\n\n**Attributes:** `id`, `@before`, `@after`',
+    }
+
+    if (tagDocs[hoverInfo.tagName]) {
+      markdown.appendMarkdown(tagDocs[hoverInfo.tagName])
     } else {
-      markdown.appendMarkdown('MCX custom tag\n\n')
-      markdown.appendMarkdown('This tag does not have built-in documentation.')
+      markdown.appendMarkdown('MCX custom tag\n\nThis tag does not have built-in documentation.')
     }
   }
 
@@ -394,31 +554,15 @@ function provideMCXHover(
     markdown.appendCodeblock(hoverInfo.attrName, 'xml')
     markdown.appendMarkdown('\n\n**MCX Attribute**\n\n')
 
-    if (hoverInfo.attrName === 'id') {
-      markdown.appendMarkdown(
-        'Unique identifier for referencing this element from script code or other tags.\n',
-      )
-    } else if (hoverInfo.attrName === 'lang') {
-      markdown.appendMarkdown(
-        'Script language specification for the `<script>` block.\n\n',
-      )
-      markdown.appendMarkdown(
-        '**Values:** `ts` (TypeScript, default), `js` (JavaScript)',
-      )
-    } else if (hoverInfo.attrName === '@before') {
-      markdown.appendMarkdown(
-        'Event hook: executes the specified script code **before** the main logic runs.\n\n',
-      )
-      markdown.appendMarkdown(
-        'Useful for setup, validation, or preprocessing steps.',
-      )
-    } else if (hoverInfo.attrName === '@after') {
-      markdown.appendMarkdown(
-        'Event hook: executes the specified script code **after** the main logic runs.\n\n',
-      )
-      markdown.appendMarkdown(
-        'Useful for cleanup, logging, or post-processing steps.',
-      )
+    const attrDocs: Record<string, string> = {
+      id: 'Unique identifier for referencing this element from script code or other tags.',
+      lang: 'Script language specification for the `<script>` block.\n\n**Values:** `ts` (TypeScript, default), `js` (JavaScript)',
+      '@before': 'Event hook: executes the specified script code **before** the main logic runs.\n\nUseful for setup, validation, or preprocessing steps.',
+      '@after': 'Event hook: executes the specified script code **after** the main logic runs.\n\nUseful for cleanup, logging, or post-processing steps.',
+    }
+
+    if (attrDocs[hoverInfo.attrName]) {
+      markdown.appendMarkdown(attrDocs[hoverInfo.attrName])
     }
 
     if (hoverInfo.attrValue) {
@@ -450,12 +594,9 @@ function analyzeHoverPosition(
   const fullLine = document.lineAt(position.line).text
   const cursorChar = position.character
 
-  // --- TAG DETECTION ---
-  // Find the last '<' before the cursor on this line to locate a potential tag.
   const ltIndex = fullLine.lastIndexOf('<', cursorChar)
   if (ltIndex !== -1) {
     const afterLt = fullLine.slice(ltIndex + 1)
-    // Allow optional '/' for closing tags like </script>
     const tagNameMatch = afterLt.match(/^\/?([A-Za-z][\w:-]*)/)
     if (tagNameMatch) {
       const tagName = tagNameMatch[1]
@@ -463,7 +604,6 @@ function analyzeHoverPosition(
       const tagNameStart = ltIndex + 1 + (isClosing ? 1 : 0)
       const tagNameEnd = tagNameStart + tagName.length
 
-      // Only treat as tag hover if cursor is actually within the tag name
       if (cursorChar >= tagNameStart && cursorChar <= tagNameEnd) {
         const tagRange = new Range(
           new Position(position.line, tagNameStart),
@@ -478,7 +618,6 @@ function analyzeHoverPosition(
     }
   }
 
-  // --- ATTRIBUTE DETECTION ---
   if (isInsideOpenTag(linePrefix)) {
     const wordRange = getWordRangeAtPosition(document, position)
     if (wordRange) {
@@ -489,7 +628,6 @@ function analyzeHoverPosition(
       if (wordRange.start.character > 0) {
         const charBefore = fullLine[wordRange.start.character - 1]
 
-        // Attribute name: preceded by whitespace
         if (charBefore === ' ' || charBefore === '\t') {
           const restOfLine = fullLine.slice(wordRange.end.character)
           const valueMatch = restOfLine.match(
@@ -505,7 +643,6 @@ function analyzeHoverPosition(
           }
         }
 
-        // Attribute value: preceded by = or opening quote
         if (charBefore === '=' || charBefore === '"' || charBefore === "'") {
           const beforeEquals = fullLine.slice(0, wordRange.start.character)
           const valueAttrMatch = beforeEquals.match(/([\w@:-]+)\s*=\s*["']?$/)
@@ -523,6 +660,73 @@ function analyzeHoverPosition(
   }
 
   return undefined
+}
+
+function provideMCXDefinition(
+  document: TextDocument,
+  position: Position,
+  _token: CancellationToken,
+): Definition | DefinitionLink[] | undefined {
+  const source = document.getText()
+  const script = getScriptBlock(source)
+  if (!script || !isInsideScriptBlock(document, position, script)) {
+    return undefined
+  }
+
+  const linePrefix = document
+    .lineAt(position.line)
+    .text.slice(0, position.character)
+
+  if (!/\.subscribe\(?\s*["']?[\w]*$/.test(linePrefix)) {
+    return undefined
+  }
+
+  const wordRange = getWordRangeAtPosition(document, position)
+  if (!wordRange) return undefined
+  const eventName = source.slice(
+    document.offsetAt(wordRange.start),
+    document.offsetAt(wordRange.end),
+  )
+  if (!eventName) return undefined
+
+  const { tags } = getCachedAST(source)
+  const eventTag = tags.find(t => t.name === 'Event')
+  if (!eventTag) return undefined
+
+  for (const child of eventTag.content) {
+    if ((child as any).type === 'TagContent') {
+      const content = (child as any).data
+      const propLines = content.split('\n')
+      for (let i = 0; i < propLines.length; i++) {
+        const propMatch = propLines[i].match(
+          new RegExp(`^\\s*${escapeRegex(eventName)}\\s*:`),
+        )
+        if (propMatch) {
+          const eventTagStart = document.offsetAt(
+            new Position(eventTag.loc.start.line - 1, 0),
+          )
+          const contentStart = eventTagStart + (eventTag.start.data?.length ?? 0)
+          const sourceBeforeEvent = source.slice(0, contentStart)
+          const eventContentLineOffset = sourceBeforeEvent.split('\n').length - 1
+      const targetLine = eventContentLineOffset + i
+      const targetCol = propMatch[0].indexOf(eventName)
+      return new Location(
+        document.uri,
+        new Range(
+          new Position(targetLine, targetCol),
+          new Position(targetLine, targetCol + eventName.length),
+        ),
+      )
+        }
+      }
+    }
+  }
+
+  return undefined
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function getScriptBlock(
