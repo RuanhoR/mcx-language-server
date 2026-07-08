@@ -668,61 +668,85 @@ function provideMCXDefinition(
   _token: CancellationToken,
 ): Definition | DefinitionLink[] | undefined {
   const source = document.getText()
-  const script = getScriptBlock(source)
-  if (!script || !isInsideScriptBlock(document, position, script)) {
-    return undefined
-  }
-
-  const linePrefix = document
-    .lineAt(position.line)
-    .text.slice(0, position.character)
-
-  if (!/\.subscribe\(?\s*["']?[\w]*$/.test(linePrefix)) {
-    return undefined
-  }
-
-  const wordRange = getWordRangeAtPosition(document, position)
-  if (!wordRange) return undefined
-  const eventName = source.slice(
-    document.offsetAt(wordRange.start),
-    document.offsetAt(wordRange.end),
-  )
-  if (!eventName) return undefined
+  const offset = document.offsetAt(position)
 
   const { tags } = getCachedAST(source)
   const eventTag = tags.find(t => t.name === 'Event')
   if (!eventTag) return undefined
 
-  for (const child of eventTag.content) {
-    if ((child as any).type === 'TagContent') {
-      const content = (child as any).data
-      const propLines = content.split('\n')
-      for (let i = 0; i < propLines.length; i++) {
-        const propMatch = propLines[i].match(
-          new RegExp(`^\\s*${escapeRegex(eventName)}\\s*:`),
-        )
-        if (propMatch) {
-          const eventTagStart = document.offsetAt(
-            new Position(eventTag.loc.start.line - 1, 0),
-          )
-          const contentStart = eventTagStart + (eventTag.start.data?.length ?? 0)
-          const sourceBeforeEvent = source.slice(0, contentStart)
-          const eventContentLineOffset = sourceBeforeEvent.split('\n').length - 1
-      const targetLine = eventContentLineOffset + i
-      const targetCol = propMatch[0].indexOf(eventName)
-      return new Location(
-        document.uri,
-        new Range(
-          new Position(targetLine, targetCol),
-          new Position(targetLine, targetCol + eventName.length),
-        ),
-      )
-        }
-      }
-    }
+  const lineOffsets = computeLineOffsets(source)
+  const eventContentRange = getTagContentRangeRaw(source, eventTag, lineOffsets)
+  if (!eventContentRange) return undefined
+
+  if (offset < eventContentRange.start || offset > eventContentRange.end) {
+    return undefined
   }
 
-  return undefined
+  const eventContent = source.slice(eventContentRange.start, eventContentRange.end)
+  const lineStart = source.lastIndexOf('\n', offset - 1)
+  const lineStartOffset = lineStart === -1 ? 0 : lineStart + 1
+  const lineEnd = source.indexOf('\n', offset)
+  const lineEndOffset = lineEnd === -1 ? source.length : lineEnd
+  const currentLine = source.slice(lineStartOffset, lineEndOffset)
+  const eqIndex = currentLine.indexOf('=')
+  if (eqIndex === -1) return undefined
+
+  const colInLine = offset - lineStartOffset
+  const valueStart = eqIndex + 1
+  if (colInLine <= valueStart) return undefined
+
+  const valueMatch = currentLine.slice(valueStart).match(/(\w+)/)
+  if (!valueMatch) return undefined
+
+  const valueStr = valueMatch[1]
+  const valueColStart = lineStartOffset + valueStart + valueMatch.index!
+  if (offset < valueColStart || offset > valueColStart + valueStr.length) {
+    return undefined
+  }
+
+  const script = getScriptBlock(source)
+  if (!script) return undefined
+
+  const scriptSource = source.slice(script.start, script.end)
+  const funcRegex = new RegExp(
+    `(?:export\\s+)?(?:function|const|let|var)\\s+${escapeRegex(valueStr)}\\b`,
+  )
+  const funcMatch = funcRegex.exec(scriptSource)
+  if (!funcMatch) return undefined
+
+  const funcOffset = script.start + funcMatch.index
+  const funcLine = source.slice(0, funcOffset).split('\n').length - 1
+  const funcCol = funcOffset - source.lastIndexOf('\n', funcOffset - 1) - 1
+
+  return new Location(
+    document.uri,
+    new Range(
+      new Position(funcLine, funcCol),
+      new Position(funcLine, funcCol + valueStr.length),
+    ),
+  )
+}
+
+function getTagContentRangeRaw(
+  source: string,
+  tag: MCXTagNode,
+  lineOffsets: number[],
+): { start: number; end: number } | null {
+  if (!tag.start || !tag.start.start) return null
+  const startOffset = offsetAt(lineOffsets, tag.start.start)
+  const startTagEnd = Math.min(
+    source.length,
+    startOffset + (tag.start.data?.length ?? 0),
+  )
+  let endTagStart = startTagEnd
+  if (tag.end?.start) {
+    endTagStart = offsetAt(lineOffsets, tag.end.start)
+  }
+  if (endTagStart < startTagEnd) endTagStart = startTagEnd
+  return {
+    start: startTagEnd,
+    end: Math.min(source.length, endTagStart),
+  }
 }
 
 function escapeRegex(str: string): string {
