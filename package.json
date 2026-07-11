@@ -30,11 +30,6 @@
   "simple-git-hooks": {
     "config": ".simple-git-hooks.mjs"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "simple-git-hooks"
-    ]
-  },
   "dependencies": {
     "rolldown-plugin-dts": "^0.25.2"
   }

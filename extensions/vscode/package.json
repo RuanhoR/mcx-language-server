@@ -10,33 +10,26 @@
     "email": "root@ruanhor.dpdns.org"
   },
   "engines": {
-    "vscode": "^1.74.0"
+    "vscode": "^1.115.0"
   },
   "categories": [
     "Programming Languages"
   ],
   "activationEvents": [
-    "onLanguage:mcx"
+    "onLanguage:mcx",
+    "workspaceContains:**/*.mcx"
   ],
   "repository": {
     "url": "https://github.com/RuanhoR/mcx-language-server"
   },
   "main": "dist/extension.js",
   "types": "dist/extension.d.ts",
-  "files": [
-    "dist",
-    "node_modules",
-    "language-configuration.json",
-    "syntaxes/mcx.tmLanguage.json",
-    "README.md",
-    "LICENSE",
-    "package.nls.json",
-    "package.nls.zh-cn.json"
-  ],
   "scripts": {
-    "build": "rollup -c",
-    "pack": "vsce package --allow-unused-files-pattern",
-    "test": "pnpm build && cd test && pnpm test"
+    "build": "rolldown -c",
+    "pack": "vsce package --no-dependencies",
+    "test": "pnpm build && cd test && pnpm test",
+    "type-check": "tsc --noEmit",
+    "check": "pnpm type-check && pnpm test"
   },
   "displayName": "MCX Language",
   "contributes": {
@@ -79,18 +72,15 @@
     ]
   },
   "dependencies": {
-    "@mbler/mcx-core": "^0.1.2-rc.10",
-    "@mbler/mcx-server": "^0.1.2-rc.3",
-    "@mbler/mcx-ts-plugin": "^0.1.2-rc.2",
-    "@types/vscode": "^1.115.0",
+    "@mbler/mcx-core": "0.1.2-rc.13",
+    "@mbler/mcx-server": "workspace:*",
+    "@mbler/mcx-ts-plugin": "workspace:*",
     "@volar/vscode": "^2.4.28",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^28.0.0",
-    "@rollup/plugin-node-resolve": "^16.0.0",
-    "@rollup/plugin-typescript": "^12.0.0",
-    "rollup": "^4.0.0",
-    "@vscode/vsce": "^3.9.1"
+    "@types/vscode": "^1.115.0",
+    "@vscode/vsce": "^3.9.1",
+    "typescript": "5.9.3"
   }
 }

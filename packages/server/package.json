@@ -1,6 +1,6 @@
 {
   "name": "@mbler/mcx-server",
-  "version": "0.1.2-rc.3",
+  "version": "0.1.2-rc.4",
   "description": "MCX Language Server",
   "engines": {
     "node": ">=20"
@@ -13,7 +13,7 @@
     "url": "https://github.com/RuanhoR"
   },
   "type": "module",
-  "main": "dist/index.cjs",
+  "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist",
@@ -27,7 +27,7 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts",
-      "require": "./dist/index.cjs"
+      "require": "./dist/index.js"
     }
   },
   "scripts": {
@@ -36,8 +36,9 @@
   },
   "dependencies": {
     "@mbler/mcx": "0.0.4-rc.1",
-    "@mbler/mcx-core": "^0.1.2-rc.10",
+    "@mbler/mcx-core": "0.1.2-rc.13",
     "@mbler/mcx-types": "^0.0.4-rc.2",
+    "@babel/parser": "^7.24.0",
     "@volar/language-core": "^2.4.28",
     "@volar/language-server": "^2.4.28",
     "volar-service-typescript": "^0.0.70",

@@ -13,11 +13,9 @@ import { middleware as volarMiddleware } from "@volar/vscode";
 export function createMCXLanguageClient(context: ExtensionContext): LanguageClient {
   const serverModule = Uri.joinPath(
     context.extensionUri,
-    "node_modules",
-    "@mbler",
-    "mcx-server",
     "dist",
-    "server.js",
+    "server",
+    "server.js"
   ).fsPath;
 
   const serverOptions: ServerOptions = {

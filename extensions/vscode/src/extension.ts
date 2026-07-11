@@ -64,9 +64,16 @@ function getCachedAST(source: string): { tags: MCXTagNode[]; compileData: any } 
 }
 
 export function activate(context: ExtensionContext): void {
-  client = createMCXLanguageClient(context)
-  void client.start()
-  void configureTypeScriptPlugin()
+  console.error("[MCX] Extension activating...");
+  client = createMCXLanguageClient(context);
+  console.error("[MCX] Starting language client...");
+  client.start().then(() => {
+    console.error("[MCX] Language client ready");
+  }).catch((e) => {
+    console.error("[MCX] Language client failed to start:", e);
+    window.showErrorMessage(`MCX language server failed to start: ${e.message}`);
+  });
+  void configureTypeScriptPlugin();
 
   const formattingProvider: DocumentFormattingEditProvider = {
     provideDocumentFormattingEdits(document, options) {
@@ -173,9 +180,13 @@ async function restartLanguageServer(context: ExtensionContext): Promise<void> {
   }
 
   client = createMCXLanguageClient(context)
-  await client.start()
-  await configureTypeScriptPlugin()
-  window.showInformationMessage('MCX language server restarted successfully.')
+  try {
+    await client.start()
+    await configureTypeScriptPlugin()
+    window.showInformationMessage('MCX language server restarted successfully.')
+  } catch (e) {
+    window.showErrorMessage(`MCX language server restart failed: ${(e as Error).message}`)
+  }
 }
 
 async function configureTypeScriptPlugin(): Promise<void> {

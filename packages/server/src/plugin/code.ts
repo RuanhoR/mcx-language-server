@@ -99,7 +99,6 @@ export class MCXVirtualCode implements VirtualCode {
         data: DISABLED_FEATURES,
       },
     ]
-
     this.embeddedCodes = []
 
     const scriptTag = tags.find(tag => tag.name === 'script')
