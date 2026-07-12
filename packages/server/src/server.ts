@@ -29,6 +29,7 @@ let project: ReturnType<typeof createTypeScriptProject>;
 
 connection.onInitialize((params) => {
   console.error("[MCX] onInitialize called");
+  console.error("[MCX] Client workspace.didChangeWatchedFiles:", JSON.stringify(params.capabilities.workspace?.didChangeWatchedFiles));
 
   const typescriptServices = createTypeScriptServices(ts);
   console.error("[MCX] TypeScript services created, capabilities:", Object.keys(typescriptServices));
@@ -41,10 +42,10 @@ connection.onInitialize((params) => {
   console.error("[MCX] server.initialize returned, capabilities:", Object.keys(result.capabilities));
 
   connection.onNotification("mcx/fileChanged", async (change: { uri: string }) => {
-    // Redundant safety net: the Volar fileWatcher (set up via watchFiles above)
-    // already handles workspace/didChangeWatchedFiles. This custom notification
-    // from the extension ensures a refresh even if the LSP chain falls through.
     console.error("[MCX] mcx/fileChanged:", change.uri);
+    // Force project reload + refresh for source file changes (ts/js/json).
+    // This bypasses Volar's fileWatcher chain entirely to ensure types update.
+    project.reload();
     server.languageFeatures.requestRefresh(false);
   });
 
@@ -61,15 +62,16 @@ connection.onInitialized(() => {
   // CRITICAL: Set up didChangeWatchedFiles handler so Volar processes file changes.
   // Without this, workspace/didChangeWatchedFiles LSP notifications are silently
   // dropped, file system caches never invalidated, and TypeScript types go stale.
+  // NOTE: connection.onDidChangeWatchedFiles uses Map.set internally,
+  // registering a SECOND handler would REPLACE Volar's handler.
+  // We must NOT register another handler for the same method.
+  console.error("[MCX] Calling watchFiles...");
   server.fileWatcher.watchFiles([
     "**/*.{mcx,ts,js,json}",
-  ]).catch((e) => {
+  ]).then(() => {
+    console.error("[MCX] watchFiles succeeded");
+  }).catch((e) => {
     console.error("[MCX] watchFiles failed:", e);
-    // Fallback: manual handler that forces project reload
-    connection.onDidChangeWatchedFiles((params) => {
-      project.reload();
-      server.languageFeatures.requestRefresh(false);
-    });
   });
 });
 
