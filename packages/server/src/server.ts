@@ -83,13 +83,11 @@ connection.onInitialize((params) => {
     console.error("[MCX] mcx/fileChanged:", change.uri);
     dirtyUris.add(change.uri);
 
-    // Dispose old TypeScript projects so a fresh createSys is created
-    // (fresh file tree with requestedText=false for all files).
-    await project.reload();
-
-    // Trigger diagnostics for all open documents. The refresh handler will
-    // read changed files through the patched fileSystem methods above,
-    // which return live disk content and invalidate fsFileSnapshots.
+    // The extension already sends workspace/didChangeWatchedFiles before this
+    // notification, which clears the createSys file-tree entry (resetting
+    // requestedText to false) AND the readFileCache/statCache in fileSystem.js.
+    // We just need to trigger a diagnostics refresh — the TypeScript project
+    // stays alive and re-reads the changed file incrementally.
     server.languageFeatures.requestRefresh(false);
   });
 
