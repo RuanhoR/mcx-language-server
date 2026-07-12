@@ -156,10 +156,13 @@ export function activate(context: ExtensionContext): void {
   })
 
   workspace.onDidSaveTextDocument(document => {
-    if (document.languageId === 'mcx' || document.languageId === 'typescript' || document.languageId === 'javascript') {
+    if (document.languageId === 'mcx' || document.languageId === 'typescript' || document.languageId === 'javascript' || document.languageId === 'json' || document.languageId === 'jsonc') {
       client?.sendNotification('workspace/didChangeWatchedFiles', {
         changes: [{ uri: document.uri.toString(), type: 2 }],
       })
+      // Redundant safety net: ensures project refresh even if Volar's file watcher
+      // chain drops the workspace/didChangeWatchedFiles notification
+      client?.sendNotification('mcx/fileChanged', { uri: document.uri.toString() })
     }
   })
 }

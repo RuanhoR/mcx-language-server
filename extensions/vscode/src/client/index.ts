@@ -43,6 +43,7 @@ export function createMCXLanguageClient(context: ExtensionContext): LanguageClie
         workspace.createFileSystemWatcher("**/*.mcx"),
         workspace.createFileSystemWatcher("**/*.ts"),
         workspace.createFileSystemWatcher("**/*.js"),
+        workspace.createFileSystemWatcher("**/*.json"),
       ],
     },
   };

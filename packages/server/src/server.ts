@@ -25,18 +25,29 @@ const server = createServerBase(connection, {
 
 const mcxLanguagePlugin = createMCXLanguagePlugin(ts);
 
+let project: ReturnType<typeof createTypeScriptProject>;
+
 connection.onInitialize((params) => {
   console.error("[MCX] onInitialize called");
 
   const typescriptServices = createTypeScriptServices(ts);
   console.error("[MCX] TypeScript services created, capabilities:", Object.keys(typescriptServices));
 
-  const project = createTypeScriptProject(ts, undefined, async () => ({
+  project = createTypeScriptProject(ts, undefined, async () => ({
     languagePlugins: [mcxLanguagePlugin],
   }));
 
   const result = server.initialize(params, project, typescriptServices);
-  console.error("[MCX] server.initialize returned");
+  console.error("[MCX] server.initialize returned, capabilities:", Object.keys(result.capabilities));
+
+  connection.onNotification("mcx/fileChanged", async (change: { uri: string }) => {
+    // Redundant safety net: the Volar fileWatcher (set up via watchFiles above)
+    // already handles workspace/didChangeWatchedFiles. This custom notification
+    // from the extension ensures a refresh even if the LSP chain falls through.
+    console.error("[MCX] mcx/fileChanged:", change.uri);
+    server.languageFeatures.requestRefresh(false);
+  });
+
   return result;
 });
 
@@ -46,6 +57,20 @@ connection.onInitialized(() => {
   server.fileSystem.install("https", httpFileSystemProvider);
   listenEditorSettings(server);
   server.initialized();
+
+  // CRITICAL: Set up didChangeWatchedFiles handler so Volar processes file changes.
+  // Without this, workspace/didChangeWatchedFiles LSP notifications are silently
+  // dropped, file system caches never invalidated, and TypeScript types go stale.
+  server.fileWatcher.watchFiles([
+    "**/*.{mcx,ts,js,json}",
+  ]).catch((e) => {
+    console.error("[MCX] watchFiles failed:", e);
+    // Fallback: manual handler that forces project reload
+    connection.onDidChangeWatchedFiles((params) => {
+      project.reload();
+      server.languageFeatures.requestRefresh(false);
+    });
+  });
 });
 
 connection.onShutdown(() => {
