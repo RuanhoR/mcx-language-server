@@ -27,6 +27,44 @@ const mcxLanguagePlugin = createMCXLanguagePlugin(ts);
 
 let project: ReturnType<typeof createTypeScriptProject>;
 
+// Set of URIs that need fresh reads from disk, bypassing all Volar caches.
+const dirtyUris = new Set<string>();
+
+/**
+ * Monkey-patch server.fileSystem so that readFile/stat bypass
+ * internal caches for files in dirtyUris.
+ *
+ * Volar has THREE layers of caching that all persist across project.reload():
+ *   1. fileSystem.js → readFileCache, statCache (shared, never cleared)
+ *   2. createSys.js  → file tree with requestedText flags (fresh after reload)
+ *   3. typescriptProjectLs.js → fsFileSnapshots (module-level, never cleared)
+ *
+ * Stat returns a different mtime to force fsFileSnapshots invalidation.
+ * ReadFile returns live disk content for the same reason.
+ * After each "hit" the URI is removed from the set.
+ */
+function patchFileSystemForDirtyUris(): void {
+  const origReadFile: Function = server.fileSystem.readFile.bind(server.fileSystem);
+  const origStat: Function = server.fileSystem.stat.bind(server.fileSystem);
+
+  server.fileSystem.readFile = (uri: any): string | undefined => {
+    const key = uri.toString();
+    if (dirtyUris.has(key)) {
+      dirtyUris.delete(key);
+      return nodeFileSystemProvider.readFile(uri);
+    }
+    return origReadFile(uri);
+  };
+
+  server.fileSystem.stat = (uri: any): lsp.FileStat | undefined => {
+    const key = uri.toString();
+    if (dirtyUris.has(key)) {
+      return { type: lsp.FileType.File, mtime: Date.now(), ctime: 0, size: -1 };
+    }
+    return origStat(uri);
+  };
+}
+
 connection.onInitialize((params) => {
   console.error("[MCX] onInitialize called");
   console.error("[MCX] Client workspace.didChangeWatchedFiles:", JSON.stringify(params.capabilities.workspace?.didChangeWatchedFiles));
@@ -43,9 +81,15 @@ connection.onInitialize((params) => {
 
   connection.onNotification("mcx/fileChanged", async (change: { uri: string }) => {
     console.error("[MCX] mcx/fileChanged:", change.uri);
-    // Force project reload + refresh for source file changes (ts/js/json).
-    // This bypasses Volar's fileWatcher chain entirely to ensure types update.
-    project.reload();
+    dirtyUris.add(change.uri);
+
+    // Dispose old TypeScript projects so a fresh createSys is created
+    // (fresh file tree with requestedText=false for all files).
+    await project.reload();
+
+    // Trigger diagnostics for all open documents. The refresh handler will
+    // read changed files through the patched fileSystem methods above,
+    // which return live disk content and invalidate fsFileSnapshots.
     server.languageFeatures.requestRefresh(false);
   });
 
@@ -59,12 +103,10 @@ connection.onInitialized(() => {
   listenEditorSettings(server);
   server.initialized();
 
-  // CRITICAL: Set up didChangeWatchedFiles handler so Volar processes file changes.
-  // Without this, workspace/didChangeWatchedFiles LSP notifications are silently
-  // dropped, file system caches never invalidated, and TypeScript types go stale.
-  // NOTE: connection.onDidChangeWatchedFiles uses Map.set internally,
-  // registering a SECOND handler would REPLACE Volar's handler.
-  // We must NOT register another handler for the same method.
+  // Patch fileSystem so mcx/fileChanged can bypass caches
+  patchFileSystemForDirtyUris();
+
+  // Set up didChangeWatchedFiles handler so Volar processes file changes.
   console.error("[MCX] Calling watchFiles...");
   server.fileWatcher.watchFiles([
     "**/*.{mcx,ts,js,json}",
