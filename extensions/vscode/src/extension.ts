@@ -37,7 +37,7 @@ const COMPONENT_PARENT_TAGS = ['items', 'blocks', 'entities']
 const COMPONENT_CHILD_TAGS = ['item', 'block', 'entity']
 const TS_PLUGIN_ID = '@mbler/mcx-ts-plugin'
 let client: LanguageClient | undefined
-const neededRestart = !patchTypeScriptExtension()
+patchTypeScriptExtension()
 
 const astCache = new Map<string, { tags: MCXTagNode[]; compileData: any; timestamp: number }>()
 const AST_CACHE_TTL = 500
@@ -76,17 +76,6 @@ export function activate(context: ExtensionContext): void {
     window.showErrorMessage(`MCX language server failed to start: ${e.message}`);
   });
   void configureTypeScriptPlugin();
-
-  if (neededRestart) {
-    window.showInformationMessage(
-      'MCX: please reload the window to enable TypeScript support for .mcx imports.',
-      'Reload Window',
-    ).then(action => {
-      if (action === 'Reload Window') {
-        commands.executeCommand('workbench.action.reloadWindow')
-      }
-    })
-  }
 
   const formattingProvider: DocumentFormattingEditProvider = {
     provideDocumentFormattingEdits(document, options) {
@@ -191,13 +180,12 @@ export async function deactivate(): Promise<void> {
 
 function patchTypeScriptExtension(): boolean {
   const tsExtension = extensions.getExtension('vscode.typescript-language-features')
-  if (!tsExtension || tsExtension.isActive) {
+  if (!tsExtension) {
     return false
   }
 
   const fs = require('node:fs') as typeof import('node:fs')
   const child_process = require('node:child_process') as typeof import('node:child_process')
-  const extensionJsPath = (require as any).resolve('./dist/extension.js', { paths: [tsExtension.extensionPath] })
   const { publisher, name } = require('../package.json') as { publisher: string; name: string }
   const mcxExtension = extensions.getExtension(`${publisher}.${name}`)
   const tsPluginName = '@mbler/mcx-ts-plugin'
@@ -212,48 +200,58 @@ function patchTypeScriptExtension(): boolean {
     ]
   }
 
-  const origReadFileSync = fs.readFileSync as (...args: any[]) => any
-  ;(fs as any).readFileSync = (...args: any[]) => {
-    if (args[0] === extensionJsPath) {
-      let text = origReadFileSync(...args) as string
+  if (!tsExtension.isActive) {
+    const extensionJsPath = (require as any).resolve('./dist/extension.js', { paths: [tsExtension.extensionPath] })
+    const origReadFileSync = fs.readFileSync as (...args: any[]) => any
+    ;(fs as any).readFileSync = (...args: any[]) => {
+      if (args[0] === extensionJsPath) {
+        let text = origReadFileSync(...args) as string
 
-      const id = String.raw`[\w$]+(?:\.[\w$]+)?`
+        const id = String.raw`[\w$]+(?:\.[\w$]+)?`
 
-      text = text.replace(
-        new RegExp(
-          String.raw`(\.jsTsLanguageModes=\[${id},${id},${id},${id}\])|("javascriptreact",(${id})=\[(${id},${id},${id},${id})\])`,
-        ),
-        (_match: string, oldFormat: string, _newFull: string, newLhs: string, newElements: string) => {
-          if (oldFormat) {
-            return oldFormat + '.concat("mcx")'
-          }
-          return `"javascriptreact",${newLhs}=[${newElements}].concat("mcx")`
-        },
-      )
-      text = text.replace(
-        new RegExp(String.raw`\.languages\.match\(\[(${id},${id},${id},${id})\]`),
-        (_: string, ids: string) => `.languages.match([${ids}].concat("mcx")`,
-      )
-      text = text.replace(
-        new RegExp(String.raw`\.languages\.match\(\[(${id},${id})\]`),
-        (_: string, ids: string) => `.languages.match([${ids}].concat("mcx")`,
-      )
-      text = text.replace(
-        new RegExp(String.raw`registerExtensionLanguageProvider\((${id}),${id}\)\{`),
-        (match: string, id: string) => `${match}if(${id}.languageIds.includes("mcx"))${id}.standardFileExtensions.push("mcx");`,
-      )
-      text = text.replace(
-        new RegExp(String.raw`.RelativePattern\(${id},"\*\*\/\*\.\{ts,tsx,js,jsx`),
-        (match: string) => `${match},mcx`,
-      )
-      text = text.replace(
-        new RegExp(String.raw`"--globalPlugins",(${id})\.plugins`),
-        (s: string) => s + `.sort((a,b)=>(b.name==="${tsPluginName}"?-1:0)-(a.name==="${tsPluginName}"?-1:0))`,
-      )
+        text = text.replace(
+          new RegExp(
+            String.raw`(\.jsTsLanguageModes=\[${id},${id},${id},${id}\])|("javascriptreact",(${id})=\[(${id},${id},${id},${id})\])`,
+          ),
+          (_match: string, oldFormat: string, _newFull: string, newLhs: string, newElements: string) => {
+            if (oldFormat) {
+              return oldFormat + '.concat("mcx")'
+            }
+            return `"javascriptreact",${newLhs}=[${newElements}].concat("mcx")`
+          },
+        )
+        text = text.replace(
+          new RegExp(String.raw`\.languages\.match\(\[(${id},${id},${id},${id})\]`),
+          (_: string, ids: string) => `.languages.match([${ids}].concat("mcx")`,
+        )
+        text = text.replace(
+          new RegExp(String.raw`\.languages\.match\(\[(${id},${id})\]`),
+          (_: string, ids: string) => `.languages.match([${ids}].concat("mcx")`,
+        )
+        text = text.replace(
+          new RegExp(String.raw`registerExtensionLanguageProvider\((${id}),${id}\)\{`),
+          (match: string, id: string) => `${match}if(${id}.languageIds.includes("mcx"))${id}.standardFileExtensions.push("mcx");`,
+        )
+        text = text.replace(
+          new RegExp(String.raw`.RelativePattern\(${id},"\*\*\/\*\.\{ts,tsx,js,jsx`),
+          (match: string) => `${match},mcx`,
+        )
+        text = text.replace(
+          new RegExp(String.raw`"--globalPlugins",(${id})\.plugins`),
+          (s: string) => s + `.sort((a,b)=>(b.name==="${tsPluginName}"?-1:0)-(a.name==="${tsPluginName}"?-1:0))`,
+        )
 
-      return text
+        return text
+      }
+      return origReadFileSync(...args)
     }
-    return origReadFileSync(...args)
+
+    const loadedModule = (require as any).cache[extensionJsPath]
+    if (loadedModule) {
+      delete (require as any).cache[extensionJsPath]
+      const patchedModule = require(extensionJsPath)
+      Object.assign(loadedModule.exports, patchedModule)
+    }
   }
 
   const origSpawn = child_process.spawn as (...args: any[]) => any
@@ -328,12 +326,6 @@ function patchTypeScriptExtension(): boolean {
     }
   }
 
-  const loadedModule = (require as any).cache[extensionJsPath]
-  if (loadedModule) {
-    delete (require as any).cache[extensionJsPath]
-    const patchedModule = require(extensionJsPath)
-    Object.assign(loadedModule.exports, patchedModule)
-  }
   return true
 }
 
