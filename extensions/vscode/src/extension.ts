@@ -37,6 +37,7 @@ const COMPONENT_PARENT_TAGS = ['items', 'blocks', 'entities']
 const COMPONENT_CHILD_TAGS = ['item', 'block', 'entity']
 const TS_PLUGIN_ID = '@mbler/mcx-ts-plugin'
 let client: LanguageClient | undefined
+const neededRestart = !patchTypeScriptExtension()
 
 const astCache = new Map<string, { tags: MCXTagNode[]; compileData: any; timestamp: number }>()
 const AST_CACHE_TTL = 500
@@ -74,8 +75,21 @@ export function activate(context: ExtensionContext): void {
     console.error("[MCX] Language client failed to start:", e);
     window.showErrorMessage(`MCX language server failed to start: ${e.message}`);
   });
-  patchTypeScriptExtension()
   void configureTypeScriptPlugin();
+
+  if (neededRestart) {
+    window.showInformationMessage(
+      'Please restart the extension host to activate MCX support.',
+      'Restart Extension Host',
+      'Reload Window',
+    ).then(action => {
+      if (action === 'Restart Extension Host') {
+        commands.executeCommand('workbench.action.restartExtensionHost')
+      } else if (action === 'Reload Window') {
+        commands.executeCommand('workbench.action.reloadWindow')
+      }
+    })
+  }
 
   const formattingProvider: DocumentFormattingEditProvider = {
     provideDocumentFormattingEdits(document, options) {
