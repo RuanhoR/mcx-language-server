@@ -21,7 +21,6 @@ import {
   type HoverProvider,
   type TextDocument,
 } from 'vscode'
-import * as path from 'node:path'
 import * as mcx from '@mbler/mcx-core'
 import type { LanguageClient } from 'vscode-languageclient/node.js'
 import { createMCXLanguageClient } from './client/index.js'
@@ -37,7 +36,6 @@ const COMPONENT_PARENT_TAGS = ['items', 'blocks', 'entities']
 const COMPONENT_CHILD_TAGS = ['item', 'block', 'entity']
 const TS_PLUGIN_ID = '@mbler/mcx-ts-plugin'
 let client: LanguageClient | undefined
-const neededRestart = !patchTypeScriptExtension()
 
 const astCache = new Map<string, { tags: MCXTagNode[]; compileData: any; timestamp: number }>()
 const AST_CACHE_TTL = 500
@@ -76,20 +74,6 @@ export function activate(context: ExtensionContext): void {
     window.showErrorMessage(`MCX language server failed to start: ${e.message}`);
   });
   void configureTypeScriptPlugin();
-
-  if (neededRestart) {
-    window.showInformationMessage(
-      'Please restart the extension host to activate MCX support.',
-      'Restart Extension Host',
-      'Reload Window',
-    ).then(action => {
-      if (action === 'Restart Extension Host') {
-        commands.executeCommand('workbench.action.restartExtensionHost')
-      } else if (action === 'Reload Window') {
-        commands.executeCommand('workbench.action.reloadWindow')
-      }
-    })
-  }
 
   const formattingProvider: DocumentFormattingEditProvider = {
     provideDocumentFormattingEdits(document, options) {
@@ -190,160 +174,6 @@ export async function deactivate(): Promise<void> {
 
   await client.stop()
   client = undefined
-}
-
-function patchTypeScriptExtension(): boolean {
-  const tsExtension = extensions.getExtension('vscode.typescript-language-features')
-  if (!tsExtension || tsExtension.isActive) {
-    return false
-  }
-
-  const fs = require('node:fs') as typeof import('node:fs')
-  const child_process = require('node:child_process') as typeof import('node:child_process')
-  const extensionJsPath = (require as any).resolve('./dist/extension.js', { paths: [tsExtension.extensionPath] })
-  const { publisher, name } = require('../package.json') as { publisher: string; name: string }
-  const mcxExtension = extensions.getExtension(`${publisher}.${name}`)
-  const tsPluginName = '@mbler/mcx-ts-plugin'
-
-  if (mcxExtension) {
-    mcxExtension.packageJSON.contributes.typescriptServerPlugins = [
-      {
-        name: tsPluginName,
-        enableForWorkspaceTypeScriptVersions: true,
-        configNamespace: 'typescript',
-      },
-    ]
-  }
-
-  const origReadFileSync = fs.readFileSync as (...args: any[]) => any
-  ;(fs as any).readFileSync = (...args: any[]) => {
-    if (args[0] === extensionJsPath) {
-      let text = origReadFileSync(...args) as string
-
-      const id = String.raw`[\w$]+(?:\.[\w$]+)?`
-
-      // patch jsTsLanguageModes — add "mcx" to the language mode list
-      text = text.replace(
-        new RegExp(
-          String.raw`(\.jsTsLanguageModes=\[${id},${id},${id},${id}\])|("javascriptreact",(${id})=\[(${id},${id},${id},${id})\])`,
-        ),
-        (_match, oldFormat, _newFull, newLhs, newElements) => {
-          if (oldFormat) {
-            return oldFormat + '.concat("mcx")'
-          }
-          return `"javascriptreact",${newLhs}=[${newElements}].concat("mcx")`
-        },
-      )
-      // patch isSupportedLanguageMode — add "mcx" to the match
-      text = text.replace(
-        new RegExp(String.raw`\.languages\.match\(\[(${id},${id},${id},${id})\]`),
-        (_, ids) => `.languages.match([${ids}].concat("mcx")`,
-      )
-      // patch isTypeScriptDocument — add "mcx" to the match
-      text = text.replace(
-        new RegExp(String.raw`\.languages\.match\(\[(${id},${id})\]`),
-        (_, ids) => `.languages.match([${ids}].concat("mcx")`,
-      )
-      // patch standardFileExtensions — add "mcx" to the standard list
-      text = text.replace(
-        new RegExp(String.raw`registerExtensionLanguageProvider\((${id}),${id}\)\{`),
-        (match, id) => `${match}if(${id}.languageIds.includes("mcx"))${id}.standardFileExtensions.push("mcx");`,
-      )
-      // patch file watcher patterns to include .mcx
-      text = text.replace(
-        new RegExp(String.raw`.RelativePattern\(${id},"\*\*\/\*\.\{ts,tsx,js,jsx`),
-        match => `${match},mcx`,
-      )
-      // sort plugins to ensure mcx plugin is first
-      text = text.replace(
-        new RegExp(String.raw`"--globalPlugins",(${id})\.plugins`),
-        s => s + `.sort((a,b)=>(b.name==="${tsPluginName}"?-1:0)-(a.name==="${tsPluginName}"?-1:0))`,
-      )
-
-      return text
-    }
-    return origReadFileSync(...args)
-  }
-
-  const origSpawn = child_process.spawn as (...args: any[]) => any
-  ;(child_process as any).spawn = (...args: any[]) => {
-    if (Array.isArray(args[1])) {
-      const index = args[1].findIndex((arg: any) => typeof arg === 'string' && isTsserverFile(arg))
-      if (index !== -1) {
-        args[1][index] = transformTsserver(args[1][index])
-      }
-    }
-    return origSpawn(...args)
-  }
-
-  const origFork = child_process.fork as (...args: any[]) => any
-  ;(child_process as any).fork = (...args: any[]) => {
-    if (typeof args[0] === 'string' && isTsserverFile(args[0])) {
-      args[0] = transformTsserver(args[0])
-    }
-    return origFork(...args)
-  }
-
-  function isTsserverFile(file: string) {
-    return path.isAbsolute(file) && path.basename(file) === 'tsserver.js'
-  }
-
-  function transformTsserver(serverPath: string) {
-    const resolvedServerPath = (require as any).resolve(serverPath, { paths: [path.dirname(serverPath)] })
-    const typescriptPath = path.join(path.dirname(resolvedServerPath), 'typescript.js')
-    const text = `
-      const fs = require('node:fs');
-      const readFileSync = fs.readFileSync;
-      fs.readFileSync = (...args) => {
-        if (args[0] === ${JSON.stringify(typescriptPath)}) {
-          let content = readFileSync(...args);
-          content = content.replace(
-            /supportedTSExtensions = .*(?=;)/,
-            s => s + \`.concat([".mcx"])\`,
-          );
-          content = content.replace(
-            /supportedJSExtensions = .*(?=;)/,
-            s => s + \`.concat([".mcx"])\`,
-          );
-          content = content.replace(
-            /allSupportedExtensions = .*(?=;)/,
-            s => s + \`.concat([".mcx"])\`,
-          );
-          content = content.replace(
-            /function changeExtension\\(/,
-            s => \`function changeExtension(path, newExtension) {
-              return [".mcx"].some(ext => path.endsWith(ext))
-              ? path + newExtension
-              : _changeExtension(path, newExtension);
-            }\n\` + s.replace("changeExtension", "_changeExtension"),
-          );
-          content = content.replace(
-            /const isJs = hasJSFileExtension\\((.*?)\\.fileName\\)/,
-            (s, file) => \`const isJs = isSourceFileJS(\${file})\`,
-          );
-          return content;
-        }
-        return readFileSync(...args);
-      };
-      require(${JSON.stringify(resolvedServerPath)});
-    `
-    try {
-      const proxyPath = path.join(__dirname, 'tsserver.js')
-      fs.writeFileSync(proxyPath, text)
-      return proxyPath
-    }
-    catch {
-      return serverPath
-    }
-  }
-
-  const loadedModule = (require as any).cache[extensionJsPath]
-  if (loadedModule) {
-    delete (require as any).cache[extensionJsPath]
-    const patchedModule = require(extensionJsPath)
-    Object.assign(loadedModule.exports, patchedModule)
-  }
-  return true
 }
 
 async function restartLanguageServer(context: ExtensionContext): Promise<void> {
