@@ -77,6 +77,11 @@ export function activate(context: ExtensionContext): void {
   });
   void configureTypeScriptPlugin();
 
+  setTimeout(() => {
+    console.error("[MCX] Restarting tsserver to apply monkey-patch...")
+    commands.executeCommand('typescript.restartTsServer')
+  }, 2000)
+
   const formattingProvider: DocumentFormattingEditProvider = {
     provideDocumentFormattingEdits(document, options) {
       return formatMCXDocument(document, options)
@@ -179,10 +184,13 @@ export async function deactivate(): Promise<void> {
 }
 
 function patchTypeScriptExtension(): boolean {
+  console.error("[MCX] patchTypeScriptExtension called")
   const tsExtension = extensions.getExtension('vscode.typescript-language-features')
   if (!tsExtension) {
+    console.error("[MCX] TS extension not found")
     return false
   }
+  console.error("[MCX] TS extension isActive:", tsExtension.isActive)
 
   const fs = require('node:fs') as typeof import('node:fs')
   const child_process = require('node:child_process') as typeof import('node:child_process')
@@ -198,9 +206,11 @@ function patchTypeScriptExtension(): boolean {
         configNamespace: 'typescript',
       },
     ]
+    console.error("[MCX] Patched typescriptServerPlugins on extension packageJSON")
   }
 
   if (!tsExtension.isActive) {
+    console.error("[MCX] TS not active yet, patching extension.js")
     const extensionJsPath = (require as any).resolve('./dist/extension.js', { paths: [tsExtension.extensionPath] })
     const origReadFileSync = fs.readFileSync as (...args: any[]) => any
     ;(fs as any).readFileSync = (...args: any[]) => {
@@ -254,12 +264,15 @@ function patchTypeScriptExtension(): boolean {
     }
   }
 
+  console.error("[MCX] Installing spawn/fork monkey-patch")
   const origSpawn = child_process.spawn as (...args: any[]) => any
   ;(child_process as any).spawn = (...args: any[]) => {
     if (Array.isArray(args[1])) {
       const index = args[1].findIndex((arg: any) => typeof arg === 'string' && isTsserverFile(arg))
       if (index !== -1) {
+        console.error("[MCX] Intercepted spawn tsserver:", args[1][index])
         args[1][index] = transformTsserver(args[1][index])
+        console.error("[MCX] Replaced with proxy:", args[1][index])
       }
     }
     return origSpawn(...args)
@@ -268,7 +281,9 @@ function patchTypeScriptExtension(): boolean {
   const origFork = child_process.fork as (...args: any[]) => any
   ;(child_process as any).fork = (...args: any[]) => {
     if (typeof args[0] === 'string' && isTsserverFile(args[0])) {
+      console.error("[MCX] Intercepted fork tsserver:", args[0])
       args[0] = transformTsserver(args[0])
+      console.error("[MCX] Replaced with proxy:", args[0])
     }
     return origFork(...args)
   }
@@ -326,6 +341,7 @@ function patchTypeScriptExtension(): boolean {
     }
   }
 
+  console.error("[MCX] patchTypeScriptExtension done, return true")
   return true
 }
 
