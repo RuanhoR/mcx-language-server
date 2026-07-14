@@ -16,6 +16,7 @@
     "Programming Languages"
   ],
   "activationEvents": [
+    "*",
     "onLanguage:mcx",
     "workspaceContains:**/*.mcx"
   ],
@@ -26,7 +27,7 @@
   "types": "dist/extension.d.ts",
   "scripts": {
     "build": "rolldown -c",
-    "pack": "vsce package --no-dependencies",
+    "pack": "vsce package --no-dependencies --allow-star-activation",
     "test": "pnpm build && cd test && pnpm test",
     "type-check": "tsc --noEmit",
     "check": "pnpm type-check && pnpm test"
