@@ -30,9 +30,10 @@ import { formatMCXDocument } from './format/index.js'
 type MCXPosition = mcx.PubType.MCXPosition
 type MCXTagNode = mcx.PubType.ParsedTagNode
 
-const TAG_COMPLETIONS = ['script', 'Event', 'Component', 'Ui']
+const TAG_COMPLETIONS = ['script', 'Event', 'Component', 'Ui', 'Form']
 const SCRIPT_LANG_VALUES = ['ts', 'js']
-const UI_LAYOUT_TYPES = ['input', 'dropdown', 'submit', 'toggle', 'slider', 'button-m', 'button', 'divider', 'title', 'body']
+const UI_LAYOUT_TYPES = ['input', 'textField', 'toggle', 'dropdown', 'slider', 'button', 'label', 'body', 'header', 'title', 'divider', 'spacer', 'close-button']
+const FORM_LAYOUT_TYPES = ['input', 'dropdown', 'submit', 'toggle', 'slider', 'button', 'button-m', 'body', 'divider', 'title']
 const COMPONENT_PARENT_TAGS = ['items', 'blocks', 'entities']
 const COMPONENT_CHILD_TAGS = ['item', 'block', 'entity']
 const MCX_EXTENSION_ID = 'ruanhor.mcx-vscode-client'
@@ -262,6 +263,8 @@ function getChildTagCompletions(parentTag: string): string[] {
       return ['entity']
     case 'Ui':
       return UI_LAYOUT_TYPES
+    case 'Form':
+      return FORM_LAYOUT_TYPES
     default:
       return TAG_COMPLETIONS
   }
@@ -378,18 +381,50 @@ function getAttributeCompletions(tagName: string, linePrefix: string): Completio
     addAttr('id', 'Component item identifier')
     addAttr('@before', 'Execute before main logic')
     addAttr('@after', 'Execute after main logic')
-  } else if (UI_LAYOUT_TYPES.includes(tagName)) {
-    addAttr('content', 'UI element content')
-    addAttr('click', 'Click handler')
-    addAttr('img', 'Button image path')
-    addAttr('default', 'Default value')
-    addAttr('option', 'Dropdown options (comma-separated)')
-    addAttr('min', 'Slider minimum value')
-    addAttr('max', 'Slider maximum value')
-    addAttr('placeholderText', 'Input placeholder text')
+  } else if (UI_LAYOUT_TYPES.includes(tagName) || FORM_LAYOUT_TYPES.includes(tagName)) {
     addAttr('tip', 'Tooltip text')
+    addAttr(':tip', 'Dynamic tooltip expression')
+    addAttr('disabled', 'Disabled state')
+    addAttr(':disabled', 'Dynamic disabled expression')
+    addAttr('visible', 'Visibility')
+    addAttr(':visible', 'Dynamic visibility expression')
+    addAttr('description', 'Description text')
+    addAttr(':description', 'Dynamic description expression')
     addAttr('for', 'For loop expression (e.g. "item in items")')
     addAttr('if', 'Conditional expression')
+    addAttr(':if', 'Dynamic conditional expression')
+
+    if (tagName === 'input' || tagName === 'textField') {
+      addAttr('placeholderText', 'Input placeholder text')
+      addAttr(':placeholderText', 'Dynamic placeholder text')
+      addAttr('default', 'Default value')
+      addAttr(':default', 'Dynamic default value')
+      addAttr(':value', 'Dynamic value binding')
+    } else if (tagName === 'toggle') {
+      addAttr('default', 'Default state (true/false)')
+      addAttr(':default', 'Dynamic default state')
+      addAttr(':value', 'Dynamic value binding')
+    } else if (tagName === 'dropdown') {
+      addAttr('default', 'Default selection index')
+      addAttr(':default', 'Dynamic default index')
+      addAttr('option', 'Dropdown options (comma-separated or array)')
+      addAttr(':option', 'Dynamic options')
+      addAttr(':value', 'Dynamic value binding')
+    } else if (tagName === 'slider') {
+      addAttr('default', 'Default value')
+      addAttr(':default', 'Dynamic default')
+      addAttr('min', 'Minimum value')
+      addAttr(':min', 'Dynamic minimum')
+      addAttr('max', 'Maximum value')
+      addAttr(':max', 'Dynamic maximum')
+      addAttr(':value', 'Dynamic value binding')
+    } else if (tagName === 'button' || tagName === 'submit' || tagName === 'button-m') {
+      addAttr('click', 'Click handler function name')
+      addAttr(':click', 'Dynamic click handler')
+      if (tagName === 'button') {
+        addAttr('img', 'Button image path')
+      }
+    }
   } else {
     addAttr('@before', 'Execute before main logic')
     addAttr('@after', 'Execute after main logic')
@@ -546,13 +581,29 @@ function provideMCXHover(
       script: 'Script block for embedded TypeScript/JavaScript code.\n\n**Attributes:** `lang`, `id`, `@before`, `@after`\n**Languages:** `ts`, `js`',
       Event: 'Event definition block for Minecraft event handlers.\n\nDefines event-driven behavior using Minecraft events.\n\n**Attributes:** `id`, `@before`, `@after`\n\n**Contents:** Subscribe to events with `subscribe("eventName", handler)`.',
       Component: 'Component definition block.\n\nDefines a reusable component with custom items, blocks, and entities.\n\n**Attributes:** `id`\n\n**Children:** `<items>`, `<blocks>`, `<entities>`',
-      Ui: 'UI definition block.\n\nDefines a custom UI layout for Minecraft.\n\n**Attributes:** `id`\n\n**Children:** `input`, `dropdown`, `submit`, `toggle`, `slider`, `button`, `button-m`, `divider`, `title`, `body`',
+      Ui: 'UI definition block.\n\nDefines a reactive CustomForm-based UI layout.\n\n**Attributes:** `id`, `setup`\n\n**Children:** `input`, `textField`, `toggle`, `dropdown`, `slider`, `button`, `label`, `body`, `header`, `title`, `divider`, `spacer`, `close-button`',
+      Form: 'Form definition block.\n\nDefines a legacy FormData-based UI (ModalFormData/ActionFormData/MessageFormData).\n\n**Attributes:** `id`, `type` (`modal`/`action`/`message`)',
       items: 'Item definitions container.\n\nWraps one or more `<item>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
       blocks: 'Block definitions container.\n\nWraps one or more `<block>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
       entities: 'Entity definitions container.\n\nWraps one or more `<entity>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
       item: 'Custom item definition.\n\nDefines a custom Minecraft item with properties.\n\n**Attributes:** `id`, `@before`, `@after`',
       block: 'Custom block definition.\n\nDefines a custom Minecraft block with properties.\n\n**Attributes:** `id`, `@before`, `@after`',
       entity: 'Custom entity definition.\n\nDefines a custom Minecraft entity with properties.\n\n**Attributes:** `id`, `@before`, `@after`',
+      input: 'Text input field.\n\n**Attributes:** `placeholderText`, `default`, `value`, `tip`, `disabled`, `visible`',
+      textField: 'Text input field (alias for `input`).\n\n**Attributes:** `placeholderText`, `default`, `value`, `tip`, `disabled`, `visible`',
+      toggle: 'Toggle/switch control.\n\n**Attributes:** `default`, `value`, `tip`, `disabled`, `visible`',
+      dropdown: 'Dropdown selection menu.\n\n**Attributes:** `default`, `option`, `value`, `tip`, `disabled`, `visible`',
+      slider: 'Slider control.\n\n**Attributes:** `default`, `min`, `max`, `value`, `tip`, `disabled`, `visible`',
+      button: 'Action button.\n\n**Attributes:** `click`, `img`, `tip`, `disabled`, `visible`',
+      submit: 'Submit button (Form mode only).\n\n**Attributes:** `click`, `tip`, `disabled`, `visible`',
+      'button-m': 'Message form button (Form mode only, max 2).\n\n**Attributes:** `click`, `tip`, `disabled`, `visible`',
+      label: 'Static text label.\n\n**Attributes:** `tip`, `disabled`, `visible`',
+      body: 'Static text body (alias for `label`).\n\n**Attributes:** `tip`, `disabled`, `visible`',
+      header: 'Section header.\n\n**Attributes:** `tip`, `disabled`, `visible`',
+      title: 'Form title.\n\n**Attributes:** `tip`, `disabled`, `visible`',
+      divider: 'Horizontal divider.\n\n**Attributes:** `tip`, `disabled`, `visible`',
+      spacer: 'Vertical spacer.\n\n**Attributes:** `tip`, `disabled`, `visible`',
+      'close-button': 'Form close button.\n\nNo content attributes.',
     }
 
     if (tagDocs[hoverInfo.tagName]) {
@@ -571,6 +622,30 @@ function provideMCXHover(
       lang: 'Script language specification for the `<script>` block.\n\n**Values:** `ts` (TypeScript, default), `js` (JavaScript)',
       '@before': 'Event hook: executes the specified script code **before** the main logic runs.\n\nUseful for setup, validation, or preprocessing steps.',
       '@after': 'Event hook: executes the specified script code **after** the main logic runs.\n\nUseful for cleanup, logging, or post-processing steps.',
+      setup: 'Marks the UI/Form as a setup-mode component. When present, the script block\'s return value is used as the setup context, and `defineProp()` macros are enabled.',
+      type: 'For `<Form>` tag: explicitly set the form type.\n\n**Values:** `modal` (ModalFormData), `action` (ActionFormData), `message` (MessageFormData)',
+      click: 'Click handler function name. The function is called when the button is clicked, receiving the player as an argument.',
+      ':click': 'Dynamic click handler expression.',
+      default: 'Default value for the form element.',
+      ':default': 'Dynamic default value expression.',
+      ':value': 'Dynamic value binding expression.',
+      option: 'Dropdown options. Comma-separated string or array expression.',
+      ':option': 'Dynamic dropdown options expression.',
+      min: 'Slider minimum value.',
+      ':min': 'Dynamic slider minimum expression.',
+      max: 'Slider maximum value.',
+      ':max': 'Dynamic slider maximum expression.',
+      placeholderText: 'Input placeholder text.',
+      ':placeholderText': 'Dynamic placeholder text expression.',
+      tip: 'Tooltip text shown on hover.',
+      ':tip': 'Dynamic tooltip expression.',
+      disabled: 'Disables the form element.',
+      ':disabled': 'Dynamic disabled expression.',
+      visible: 'Controls element visibility.',
+      ':visible': 'Dynamic visibility expression.',
+      description: 'Description text for the element.',
+      ':description': 'Dynamic description expression.',
+      img: 'Button image path (Form mode only).',
     }
 
     if (attrDocs[hoverInfo.attrName]) {

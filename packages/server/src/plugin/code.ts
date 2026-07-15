@@ -159,6 +159,7 @@ export class MCXVirtualCode implements VirtualCode {
 
   private parseTagNodes(source: string): MCXTagNode[] {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const parser = new (mcx as any).AST.tag(source)
       return parser.parseAST() as MCXTagNode[]
     } catch {
@@ -475,6 +476,7 @@ export class MCXVirtualCode implements VirtualCode {
     return 'import("@mbler/mcx-types").MCXFile<"component">'
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private hasScriptDefaultExport(exportNodes: any[]): boolean {
     for (const item of exportNodes) {
       if (!item || typeof item !== 'object') {
@@ -502,6 +504,7 @@ export class MCXVirtualCode implements VirtualCode {
     return false
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private getExportedName(node: any): string | undefined {
     if (!node || typeof node !== 'object') {
       return void 0
@@ -540,12 +543,15 @@ export class MCXVirtualCode implements VirtualCode {
     }
 
     const uiTag = tags.find(tag => tag.name === 'Ui')
-    if (uiTag) {
-      const hasUiBody = this.firstTextChild(uiTag)?.trim()
-      if (hasUiBody) {
-        chunks.push('\n/* MCX Ui block exists */')
-        chunks.push('const __mcx_has_ui_block = true;')
-        chunks.push('void __mcx_has_ui_block;')
+    const formTag = tags.find(tag => tag.name === 'Form')
+    const layoutTag = uiTag || formTag
+    if (layoutTag) {
+      const refs = this.collectLayoutReferences(layoutTag)
+      if (refs.length > 0) {
+        chunks.push('\n/* MCX UI/Form template variable references */')
+        for (const ref of refs) {
+          chunks.push(`void (${ref});`)
+        }
       }
     }
 
@@ -591,6 +597,61 @@ export class MCXVirtualCode implements VirtualCode {
     }
 
     return refs
+  }
+
+  private collectLayoutReferences(layoutTag: MCXTagNode): string[] {
+    const refs = new Set<string>()
+    const reserved = new Set(['true', 'false', 'null', 'undefined', 'this', 'new', 'typeof', 'instanceof', 'void', 'NaN', 'Infinity'])
+
+    const extractIds = (expr: string) => {
+      const regex = /\b([a-zA-Z_$][\w$]*)\b/g
+      let m: RegExpExecArray | null
+      while ((m = regex.exec(expr)) !== null) {
+        if (!reserved.has(m[1]!)) {
+          refs.add(m[1]!)
+        }
+      }
+    }
+
+    for (const child of layoutTag.content) {
+      if (!this.isTagNode(child)) continue
+
+      // Extract from tag body content: {{ expr }}
+      const textContent = this.firstTextChild(child)
+      if (textContent) {
+        const interpolationRegex = /\{\{\s*(.*?)\s*\}\}/g
+        let match: RegExpExecArray | null
+        while ((match = interpolationRegex.exec(textContent)) !== null) {
+          extractIds(match[1]!)
+        }
+      }
+
+      // Extract from dynamic attributes: :name="expr"
+      if (child.arr && typeof child.arr === 'object') {
+        for (const [key, value] of Object.entries(child.arr)) {
+          if (key.startsWith(':') && typeof value === 'string') {
+            extractIds(value)
+          }
+        }
+
+        // Extract from 'for': "variable in|of propName"
+        const forVal = child.arr.for
+        if (typeof forVal === 'string') {
+          const forMatch = forVal.match(/^(\w+)\s+(?:in|of)\s+(\w+)$/)
+          if (forMatch) {
+            extractIds(forMatch[2]!)
+          }
+        }
+
+        // Extract from 'if'
+        const ifVal = child.arr.if
+        if (typeof ifVal === 'string') {
+          extractIds(ifVal)
+        }
+      }
+    }
+
+    return [...refs]
   }
 
   private isSafeReferenceExpression(value: string): boolean {

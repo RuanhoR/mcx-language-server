@@ -32,7 +32,8 @@
   },
   "scripts": {
     "build": "rolldown -c",
-    "test": "vitest run"
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@mbler/mcx": "0.0.4-rc.1",

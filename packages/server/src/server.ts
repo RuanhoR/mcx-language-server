@@ -8,8 +8,7 @@ import ts from "typescript";
 import { createMCXLanguagePlugin } from "./plugin/index.js";
 
 const connection = lsp.createConnection(lsp.ProposedFeatures.all);
-type ImmediateFn = (callback: (...args: any[]) => void, ...args: any[]) => void;
-const immediate = (globalThis as { setImmediate?: ImmediateFn }).setImmediate;
+const immediate = (globalThis as unknown as { setImmediate?: (...args: unknown[]) => void }).setImmediate;
 
 const server = createServerBase(connection, {
   timer: {
@@ -44,14 +43,14 @@ const dirtyUris = new Set<string>();
  * After each "hit" the URI is removed from the set.
  */
 function patchFileSystemForDirtyUris(): void {
-  const origReadFile: Function = server.fileSystem.readFile.bind(server.fileSystem);
-  const origStat: Function = server.fileSystem.stat.bind(server.fileSystem);
+  const origReadFile = server.fileSystem.readFile.bind(server.fileSystem);
+  const origStat = server.fileSystem.stat.bind(server.fileSystem);
 
   server.fileSystem.readFile = (uri) => {
     const key = uri.toString();
     if (dirtyUris.has(key)) {
       dirtyUris.delete(key);
-      return nodeFileSystemProvider.readFile(uri) as string | undefined;
+      return nodeFileSystemProvider.readFile(uri) as ReturnType<typeof origReadFile>;
     }
     return origReadFile(uri);
   };
@@ -84,8 +83,9 @@ function patchFileSystemForDirtyUris(): void {
 
   project = createTypeScriptProject(ts, undefined, async () => ({
     languagePlugins: [mcxLanguagePlugin],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setup({ project: proj }: any) {
-        const host: any = proj.typescript.languageServiceHost;
+        const host = proj.typescript.languageServiceHost as import('typescript').LanguageServiceHost & { getExtraFileExtensions?: () => { extension: string; isMixedContent: boolean; scriptKind: number }[] };
         if (host && extraFileExtensionsList.length) {
           const origCompilationSettings = host.getCompilationSettings?.bind(host);
           if (origCompilationSettings) {

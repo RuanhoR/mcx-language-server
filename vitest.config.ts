@@ -5,11 +5,9 @@ export default defineConfig({
     include: ['packages/*/__test__/**/*.spec.ts'],
     coverage: {
       provider: 'v8',
+      reporter: ['text', 'text-summary'],
       include: ['packages/*/src/**/*.ts'],
-      exclude: [
-        'packages/*/src/**/*.d.ts',
-        '**/node_modules/**',
-      ],
+      exclude: ['packages/*/src/**/*.d.ts'],
     },
   },
 })

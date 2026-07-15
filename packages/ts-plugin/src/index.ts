@@ -2,9 +2,11 @@ import { createLanguageServicePlugin } from "@volar/typescript/lib/quickstart/cr
 import { createMCXLanguagePlugin } from "@mbler/mcx-server";
 
 const plugin = createLanguageServicePlugin((ts: typeof import("typescript"), info: { languageServiceHost: import("typescript").LanguageServiceHost }) => {
-  console.error('[MCX_TSPLUGIN] Plugin loaded! project:', (info.project as any)?.getProjectName?.() ?? 'unknown')
+  console.error('[MCX_TSPLUGIN] Plugin loaded!')
 
-  const host = info.languageServiceHost;
+  const host = info.languageServiceHost as import('typescript').LanguageServiceHost & {
+    getExtraFileExtensions?: () => { extension: string; isMixedContent: boolean; scriptKind: number }[]
+  };
 
   const origCompilationSettings = host.getCompilationSettings.bind(host);
   host.getCompilationSettings = () => {
@@ -20,11 +22,11 @@ const plugin = createLanguageServicePlugin((ts: typeof import("typescript"), inf
     return opts;
   };
 
-  const origGetExtraFileExtensions = (host as any).getExtraFileExtensions?.bind(host);
+  const origGetExtraFileExtensions = host.getExtraFileExtensions?.bind(host);
   if (origGetExtraFileExtensions) {
-    (host as any).getExtraFileExtensions = () => {
-      const orig: any[] = origGetExtraFileExtensions() ?? [];
-      const existing = new Set(orig.map((e: any) => e.extension));
+    host.getExtraFileExtensions = () => {
+      const orig = origGetExtraFileExtensions() ?? [];
+      const existing = new Set(orig.map(e => e.extension));
       if (!existing.has("mcx")) {
         console.error('[MCX_TSPLUGIN] Adding .mcx to extraFileExtensions')
         orig.push({ extension: "mcx", isMixedContent: true, scriptKind: ts.ScriptKind.Deferred });
