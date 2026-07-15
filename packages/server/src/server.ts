@@ -47,33 +47,83 @@ function patchFileSystemForDirtyUris(): void {
   const origReadFile: Function = server.fileSystem.readFile.bind(server.fileSystem);
   const origStat: Function = server.fileSystem.stat.bind(server.fileSystem);
 
-  server.fileSystem.readFile = (uri: any): string | undefined => {
+  server.fileSystem.readFile = (uri) => {
     const key = uri.toString();
     if (dirtyUris.has(key)) {
       dirtyUris.delete(key);
-      return nodeFileSystemProvider.readFile(uri);
+      return nodeFileSystemProvider.readFile(uri) as string | undefined;
     }
     return origReadFile(uri);
   };
 
-  server.fileSystem.stat = (uri: any): lsp.FileStat | undefined => {
+  server.fileSystem.stat = (uri) => {
     const key = uri.toString();
     if (dirtyUris.has(key)) {
-      return { type: lsp.FileType.File, mtime: Date.now(), ctime: 0, size: -1 };
+      // Use numeric literal: FileType.File = 1 (vscode-languageserver FileType
+      // may be tree-shaken in bundled output, causing crash at runtime)
+      return { type: 1, mtime: Date.now(), ctime: 0, size: -1 };
     }
     return origStat(uri);
   };
 }
 
-connection.onInitialize((params) => {
+  connection.onInitialize((params) => {
   console.error("[MCX] onInitialize called");
   console.error("[MCX] Client workspace.didChangeWatchedFiles:", JSON.stringify(params.capabilities.workspace?.didChangeWatchedFiles));
 
   const typescriptServices = createTypeScriptServices(ts);
   console.error("[MCX] TypeScript services created, capabilities:", Object.keys(typescriptServices));
 
+  console.error("[MCX] MCX plugin extraFileExtensions:", JSON.stringify(mcxLanguagePlugin.typescript?.extraFileExtensions));
+  console.error("[MCX] MCX plugin has typescript:", !!mcxLanguagePlugin.typescript);
+
+  const extraFileExtensionsList: Array<{ extension: string; isMixedContent: boolean; scriptKind: number }> = [];
+  if (mcxLanguagePlugin.typescript?.extraFileExtensions) {
+    extraFileExtensionsList.push(...mcxLanguagePlugin.typescript.extraFileExtensions);
+  }
+
   project = createTypeScriptProject(ts, undefined, async () => ({
     languagePlugins: [mcxLanguagePlugin],
+      setup({ project: proj }: any) {
+        const host: any = proj.typescript.languageServiceHost;
+        if (host && extraFileExtensionsList.length) {
+          const origCompilationSettings = host.getCompilationSettings?.bind(host);
+          if (origCompilationSettings) {
+            host.getCompilationSettings = () => {
+              const opts = origCompilationSettings();
+              opts.allowNonTsExtensions ??= true;
+              opts.allowArbitraryExtensions ??= true;
+              return opts;
+            };
+          }
+          host.getExtraFileExtensions = () => extraFileExtensionsList;
+
+          // Patch getScriptSnapshot to debug .mcx file loading
+          const origGetScriptSnapshot = host.getScriptSnapshot.bind(host);
+          host.getScriptSnapshot = (fileName: string) => {
+            const result = origGetScriptSnapshot(fileName);
+            if (fileName.includes('.mcx')) {
+              console.error("[MCX] getScriptSnapshot:", fileName, "result:", result ? "found" : "undefined");
+              if (result) {
+                console.error("[MCX] getScriptSnapshot text:", result.getText(0, Math.min(result.getLength(), 200)));
+              }
+            }
+            return result;
+          };
+
+          // Patch fileExists to debug .mcx detection
+          const origFileExists = host.fileExists.bind(host);
+          host.fileExists = (fileName: string) => {
+            const result = origFileExists(fileName);
+            if (fileName.includes('.mcx')) {
+              console.error("[MCX] fileExists:", fileName, "result:", result);
+            }
+            return result;
+          };
+
+          console.error("[MCX] setup: patched getScriptSnapshot, fileExists");
+        }
+      },
   }));
 
   const result = server.initialize(params, project, typescriptServices);

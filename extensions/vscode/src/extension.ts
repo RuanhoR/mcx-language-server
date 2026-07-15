@@ -35,7 +35,7 @@ const SCRIPT_LANG_VALUES = ['ts', 'js']
 const UI_LAYOUT_TYPES = ['input', 'dropdown', 'submit', 'toggle', 'slider', 'button-m', 'button', 'divider', 'title', 'body']
 const COMPONENT_PARENT_TAGS = ['items', 'blocks', 'entities']
 const COMPONENT_CHILD_TAGS = ['item', 'block', 'entity']
-const TS_PLUGIN_ID = '@mbler/mcx-ts-plugin'
+const MCX_EXTENSION_ID = 'ruanhor.mcx-vscode-client'
 let client: LanguageClient | undefined
 patchTypeScriptExtension()
 
@@ -66,7 +66,8 @@ function getCachedAST(source: string): { tags: MCXTagNode[]; compileData: any } 
 }
 
 export function activate(context: ExtensionContext): void {
-  console.error("[MCX] Extension activating...");
+  console.error('[MCX] Extension activating...')
+
   client = createMCXLanguageClient(context);
   console.error("[MCX] Starting language client...");
   client.start().then(() => {
@@ -75,12 +76,11 @@ export function activate(context: ExtensionContext): void {
     console.error("[MCX] Language client failed to start:", e);
     window.showErrorMessage(`MCX language server failed to start: ${e.message}`);
   });
-  void configureTypeScriptPlugin();
 
   setTimeout(() => {
     console.error("[MCX] Restarting tsserver to apply monkey-patch...")
     commands.executeCommand('typescript.restartTsServer')
-  }, 2000)
+  }, 3000)
 
   const formattingProvider: DocumentFormattingEditProvider = {
     provideDocumentFormattingEdits(document, options) {
@@ -183,166 +183,18 @@ export async function deactivate(): Promise<void> {
   client = undefined
 }
 
-function patchTypeScriptExtension(): boolean {
-  console.error("[MCX] patchTypeScriptExtension called")
-  const tsExtension = extensions.getExtension('vscode.typescript-language-features')
-  if (!tsExtension) {
-    console.error("[MCX] TS extension not found")
-    return false
-  }
-  console.error("[MCX] TS extension isActive:", tsExtension.isActive)
-
-  const fs = require('node:fs') as typeof import('node:fs')
-  const child_process = require('node:child_process') as typeof import('node:child_process')
-  const { publisher, name } = require('../package.json') as { publisher: string; name: string }
-  const mcxExtension = extensions.getExtension(`${publisher}.${name}`)
-  const tsPluginName = '@mbler/mcx-ts-plugin'
-
+function patchTypeScriptExtension(): void {
+  console.error('[MCX] patchTypeScriptExtension called')
+  const mcxExtension = extensions.getExtension(MCX_EXTENSION_ID)
   if (mcxExtension) {
     mcxExtension.packageJSON.contributes.typescriptServerPlugins = [
       {
-        name: tsPluginName,
+        name: 'mcx-typescript-plugin-pack',
         enableForWorkspaceTypeScriptVersions: true,
-        configNamespace: 'typescript',
       },
     ]
-    console.error("[MCX] Patched typescriptServerPlugins on extension packageJSON")
   }
-
-  if (!tsExtension.isActive) {
-    console.error("[MCX] TS not active yet, patching extension.js")
-    const extensionJsPath = (require as any).resolve('./dist/extension.js', { paths: [tsExtension.extensionPath] })
-    const origReadFileSync = fs.readFileSync as (...args: any[]) => any
-    ;(fs as any).readFileSync = (...args: any[]) => {
-      if (args[0] === extensionJsPath) {
-        let text = origReadFileSync(...args) as string
-
-        const id = String.raw`[\w$]+(?:\.[\w$]+)?`
-
-        text = text.replace(
-          new RegExp(
-            String.raw`(\.jsTsLanguageModes=\[${id},${id},${id},${id}\])|("javascriptreact",(${id})=\[(${id},${id},${id},${id})\])`,
-          ),
-          (_match: string, oldFormat: string, _newFull: string, newLhs: string, newElements: string) => {
-            if (oldFormat) {
-              return oldFormat + '.concat("mcx")'
-            }
-            return `"javascriptreact",${newLhs}=[${newElements}].concat("mcx")`
-          },
-        )
-        text = text.replace(
-          new RegExp(String.raw`\.languages\.match\(\[(${id},${id},${id},${id})\]`),
-          (_: string, ids: string) => `.languages.match([${ids}].concat("mcx")`,
-        )
-        text = text.replace(
-          new RegExp(String.raw`\.languages\.match\(\[(${id},${id})\]`),
-          (_: string, ids: string) => `.languages.match([${ids}].concat("mcx")`,
-        )
-        text = text.replace(
-          new RegExp(String.raw`registerExtensionLanguageProvider\((${id}),${id}\)\{`),
-          (match: string, id: string) => `${match}if(${id}.languageIds.includes("mcx"))${id}.standardFileExtensions.push("mcx");`,
-        )
-        text = text.replace(
-          new RegExp(String.raw`.RelativePattern\(${id},"\*\*\/\*\.\{ts,tsx,js,jsx`),
-          (match: string) => `${match},mcx`,
-        )
-        text = text.replace(
-          new RegExp(String.raw`"--globalPlugins",(${id})\.plugins`),
-          (s: string) => s + `.sort((a,b)=>(b.name==="${tsPluginName}"?-1:0)-(a.name==="${tsPluginName}"?-1:0))`,
-        )
-
-        return text
-      }
-      return origReadFileSync(...args)
-    }
-
-    const loadedModule = (require as any).cache[extensionJsPath]
-    if (loadedModule) {
-      delete (require as any).cache[extensionJsPath]
-      const patchedModule = require(extensionJsPath)
-      Object.assign(loadedModule.exports, patchedModule)
-    }
-  }
-
-  console.error("[MCX] Installing spawn/fork monkey-patch")
-  const origSpawn = child_process.spawn as (...args: any[]) => any
-  ;(child_process as any).spawn = (...args: any[]) => {
-    if (Array.isArray(args[1])) {
-      const index = args[1].findIndex((arg: any) => typeof arg === 'string' && isTsserverFile(arg))
-      if (index !== -1) {
-        console.error("[MCX] Intercepted spawn tsserver:", args[1][index])
-        args[1][index] = transformTsserver(args[1][index])
-        console.error("[MCX] Replaced with proxy:", args[1][index])
-      }
-    }
-    return origSpawn(...args)
-  }
-
-  const origFork = child_process.fork as (...args: any[]) => any
-  ;(child_process as any).fork = (...args: any[]) => {
-    if (typeof args[0] === 'string' && isTsserverFile(args[0])) {
-      console.error("[MCX] Intercepted fork tsserver:", args[0])
-      args[0] = transformTsserver(args[0])
-      console.error("[MCX] Replaced with proxy:", args[0])
-    }
-    return origFork(...args)
-  }
-
-  function isTsserverFile(file: string) {
-    return path.isAbsolute(file) && path.basename(file) === 'tsserver.js'
-  }
-
-  function transformTsserver(serverPath: string) {
-    const resolvedServerPath = (require as any).resolve(serverPath, { paths: [path.dirname(serverPath)] })
-    const typescriptPath = path.join(path.dirname(resolvedServerPath), 'typescript.js')
-    const text = `
-      const fs = require('node:fs');
-      const readFileSync = fs.readFileSync;
-      fs.readFileSync = (...args) => {
-        if (args[0] === ${JSON.stringify(typescriptPath)}) {
-          let content = readFileSync(...args);
-          content = content.replace(
-            /supportedTSExtensions = .*(?=;)/,
-            s => s + \`.concat([".mcx"])\`,
-          );
-          content = content.replace(
-            /supportedJSExtensions = .*(?=;)/,
-            s => s + \`.concat([".mcx"])\`,
-          );
-          content = content.replace(
-            /allSupportedExtensions = .*(?=;)/,
-            s => s + \`.concat([".mcx"])\`,
-          );
-          content = content.replace(
-            /function changeExtension\\(/,
-            s => \`function changeExtension(path, newExtension) {
-              return [".mcx"].some(ext => path.endsWith(ext))
-              ? path + newExtension
-              : _changeExtension(path, newExtension);
-            }\n\` + s.replace("changeExtension", "_changeExtension"),
-          );
-          content = content.replace(
-            /const isJs = hasJSFileExtension\\((.*?)\\.fileName\\)/,
-            (s, file) => \`const isJs = isSourceFileJS(\${file})\`,
-          );
-          return content;
-        }
-        return readFileSync(...args);
-      };
-      require(${JSON.stringify(resolvedServerPath)});
-    `
-    try {
-      const proxyPath = path.join(__dirname, 'tsserver.js')
-      fs.writeFileSync(proxyPath, text)
-      return proxyPath
-    }
-    catch {
-      return serverPath
-    }
-  }
-
-  console.error("[MCX] patchTypeScriptExtension done, return true")
-  return true
+  console.error('[MCX] patchTypeScriptExtension done')
 }
 
 async function restartLanguageServer(context: ExtensionContext): Promise<void> {
@@ -354,45 +206,22 @@ async function restartLanguageServer(context: ExtensionContext): Promise<void> {
   client = createMCXLanguageClient(context)
   try {
     await client.start()
-    await configureTypeScriptPlugin()
     window.showInformationMessage('MCX language server restarted successfully.')
   } catch (e) {
     window.showErrorMessage(`MCX language server restart failed: ${(e as Error).message}`)
   }
 }
 
-async function configureTypeScriptPlugin(): Promise<void> {
-  const tsExtension = extensions.getExtension(
-    'vscode.typescript-language-features',
-  )
-  if (!tsExtension) {
-    return
-  }
-
-  await tsExtension.activate()
-
-  const api = (
-    tsExtension.exports as { getAPI?: (version: number) => any } | undefined
-  )?.getAPI?.(0)
-  if (!api || typeof api.configurePlugin !== 'function') {
-    return
-  }
-
-  api.configurePlugin(TS_PLUGIN_ID, {
-    enabled: true,
-    extension: 'mcx',
-  })
-}
-
 async function ensureMCXLanguage(document: TextDocument): Promise<void> {
   if (!document.uri.fsPath.endsWith('.mcx')) {
     return
   }
-  if (document.languageId === 'plaintext') {
+  const tsLike = ['plaintext', 'typescript', 'javascript', 'typescriptreact', 'javascriptreact']
+  if (tsLike.includes(document.languageId)) {
     try {
       await languages.setTextDocumentLanguage(document, 'mcx')
     } catch {
-      // not a plaintext document
+      // unable to set language
     }
   }
 }

@@ -38,7 +38,7 @@ importers:
         version: 4.1.8(@types/node@25.9.3)(@vitest/coverage-v8@4.1.9)(vite@8.0.16(@types/node@25.9.3))
 
   extensions/vscode:
-    dependencies:
+    devDependencies:
       '@mbler/mcx-core':
         specifier: 0.1.2-rc.13
         version: 0.1.2-rc.13(@minecraft/common@1.3.0)(@minecraft/vanilla-data@1.26.20)(rolldown@1.1.1)(rollup@4.59.0)
@@ -48,22 +48,21 @@ importers:
       '@mbler/mcx-ts-plugin':
         specifier: workspace:*
         version: link:../../packages/ts-plugin
-      '@volar/vscode':
-        specifier: ^2.4.28
-        version: 2.4.28
-      vscode-languageclient:
-        specifier: ^9.0.1
-        version: 9.0.1
-    devDependencies:
       '@types/vscode':
         specifier: ^1.115.0
         version: 1.125.0
+      '@volar/vscode':
+        specifier: ^2.4.28
+        version: 2.4.28
       '@vscode/vsce':
         specifier: ^3.9.1
         version: 3.9.2
       typescript:
         specifier: 5.9.3
         version: 5.9.3
+      vscode-languageclient:
+        specifier: ^9.0.1
+        version: 9.0.1
 
   packages/server:
     dependencies:

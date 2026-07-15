@@ -1,6 +1,4 @@
-**/*.map
-**/tsconfig.json
-src/**
-*.config.mjs
-changelog/**
-node_modules/**
+src
+tsconfig.json
+rolldown.config.mjs
+changelog

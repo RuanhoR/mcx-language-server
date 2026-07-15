@@ -16,9 +16,7 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "*",
-    "onLanguage:mcx",
-    "workspaceContains:**/*.mcx"
+    "onLanguage"
   ],
   "repository": {
     "url": "https://github.com/RuanhoR/mcx-language-server"
@@ -27,7 +25,7 @@
   "types": "dist/extension.d.ts",
   "scripts": {
     "build": "rolldown -c",
-    "pack": "vsce package --no-dependencies --allow-star-activation",
+    "pack": "npx @vscode/vsce package --allow-star-activation",
     "test": "pnpm build && cd test && pnpm test",
     "type-check": "tsc --noEmit",
     "check": "pnpm type-check && pnpm test"
@@ -67,21 +65,19 @@
     ],
     "typescriptServerPlugins": [
       {
-        "name": "@mbler/mcx-ts-plugin",
+        "name": "mcx-typescript-plugin-pack",
         "enableForWorkspaceTypeScriptVersions": true
       }
     ]
   },
-  "dependencies": {
+  "devDependencies": {
     "@mbler/mcx-core": "0.1.2-rc.13",
     "@mbler/mcx-server": "workspace:*",
     "@mbler/mcx-ts-plugin": "workspace:*",
-    "@volar/vscode": "^2.4.28",
-    "vscode-languageclient": "^9.0.1"
-  },
-  "devDependencies": {
     "@types/vscode": "^1.115.0",
+    "@volar/vscode": "^2.4.28",
     "@vscode/vsce": "^3.9.1",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vscode-languageclient": "^9.0.1"
   }
 }

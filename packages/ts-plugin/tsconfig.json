@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "preserve",
     "target": "es2024",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
+    "noEmit": true,
     "strict": true,
     "rootDir": "src",
     "outDir": "dist",

@@ -34,6 +34,20 @@ function copyServerDist() {
   }
 }
 
+function createPluginPack() {
+  return {
+    name: "create-plugin-pack",
+    closeBundle() {
+      const dir = "node_modules/mcx-typescript-plugin-pack"
+      const entry = path.join(dir, "index.js")
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+      }
+      fs.writeFileSync(entry, "module.exports = require('../../dist/ts-plugin.js');\n")
+    },
+  }
+}
+
 function inlineBabelRequires() {
   return {
     name: "inline-babel-requires",
@@ -100,6 +114,6 @@ export default defineConfig([
         "@volar/typescript": path.resolve("../../node_modules/.pnpm/@volar+typescript@2.4.28/node_modules/@volar/typescript"),
       },
     },
-    plugins: [inlineBabelRequires()],
+    plugins: [inlineBabelRequires(), createPluginPack()],
   },
 ])

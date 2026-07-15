@@ -5,8 +5,8 @@ import type {
   VirtualCode,
 } from '@volar/language-core'
 
-type MCXPosition = mcx.PUBTYPE.MCXPosition
-type MCXTagNode = mcx.PUBTYPE.ParsedTagNode
+type MCXPosition = mcx.PubType.MCXPosition
+type MCXTagNode = mcx.PubType.ParsedTagNode
 
 interface TagContentRange {
   start: number
