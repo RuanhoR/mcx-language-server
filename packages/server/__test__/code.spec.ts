@@ -24,6 +24,7 @@ interface MockCompileData {
     Event: { on: string; subscribe: Record<string, string>; loc: { line: number; column: number }; isLoad: boolean }
     Component: Record<string, { type: string; useExpore: string; loc: { line: number; column: number } }>
     UI: MockTagNode | null
+    Form: MockTagNode | null
   }
   File: string
   isFile: boolean
@@ -77,6 +78,10 @@ function createEventTag(content: string): MockTagNode {
 
 function createUiTag(content: string): MockTagNode {
   return createTag('Ui', content, {}, 3, 0)
+}
+
+function createFormTag(content: string): MockTagNode {
+  return createTag('Form', content, {}, 4, 0)
 }
 
 function createComponentTag(content: string): MockTagNode {
@@ -221,6 +226,7 @@ describe('MCXVirtualCode', () => {
         Event: { on: 'after', subscribe: {}, loc: { line: 1, column: 0 }, isLoad: true },
         Component: {},
         UI: null,
+        Form: null,
       },
       File: '', isFile: false, setFilePath: () => {},
     }
@@ -267,6 +273,16 @@ describe('MCXVirtualCode', () => {
     expect(uiRaw!.languageId).toBe('mcx')
   })
 
+  it('should create raw embedded code for Form tag', async () => {
+    const { MCXVirtualCode } = await import('../src/plugin/code')
+    mockState._parseData.parseASTResult = [createFormTag('<input label="name" />')]
+    const snapshot = makeSnapshot('<Form><input label="name" /></Form>')
+    const code = new MCXVirtualCode(snapshot)
+    const formRaw = code.embeddedCodes.find(e => e.id === 'form-raw')
+    expect(formRaw).toBeDefined()
+    expect(formRaw!.languageId).toBe('mcx')
+  })
+
   it('should create all embedded codes for full .mcx content', async () => {
     const { MCXVirtualCode } = await import('../src/plugin/code')
     mockState._parseData.compileResult = {
@@ -277,6 +293,7 @@ describe('MCXVirtualCode', () => {
         Event: { on: 'after', subscribe: { playerJoin: 'onPlayerJoin' }, loc: { line: 1, column: 0 }, isLoad: true },
         Component: { items: { type: 'item', useExpore: 'test', loc: { line: 1, column: 0 } } },
         UI: { start: { start: { line: 3, column: 0 }, data: '<Ui>' }, name: 'Ui', arr: {}, content: [], end: null, loc: { start: { line: 3, column: 0 }, end: { line: 3, column: 0 } }, type: 'TagNode' },
+        Form: null,
       },
       File: '', isFile: false, setFilePath: () => {},
     }
@@ -346,6 +363,7 @@ describe('MCXVirtualCode', () => {
         Event: { on: 'after', subscribe: { playerJoin: 'onPlayerJoin' }, loc: { line: 1, column: 0 }, isLoad: true },
         Component: {},
         UI: null,
+        Form: null,
       },
       File: '', isFile: false, setFilePath: () => {},
     }
@@ -412,6 +430,7 @@ describe('MCXVirtualCode', () => {
         Event: { on: 'after', subscribe: {}, loc: { line: 1, column: 0 }, isLoad: false },
         Component: {},
         UI: null,
+        Form: null,
       },
       File: '', isFile: false, setFilePath: () => {},
     }

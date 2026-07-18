@@ -155,6 +155,20 @@ export class MCXVirtualCode implements VirtualCode {
         this.embeddedCodes.push(uiRaw)
       }
     }
+
+    const formTag = tags.find(tag => tag.name === 'Form')
+    if (formTag) {
+      const formRaw = this.createRawEmbedded(
+        'form-raw',
+        'mcx',
+        source,
+        formTag,
+        lineOffsets,
+      )
+      if (formRaw) {
+        this.embeddedCodes.push(formRaw)
+      }
+    }
   }
 
   private parseTagNodes(source: string): MCXTagNode[] {
@@ -447,7 +461,7 @@ export class MCXVirtualCode implements VirtualCode {
     if (compileData?.strLoc?.Event?.isLoad) {
       type = 'event'
     }
-    if (compileData?.strLoc?.UI) {
+    if (compileData?.strLoc?.UI || (compileData?.strLoc as any)?.Form) {
       type = 'ui'
     }
     if (Object.keys(compileData?.strLoc?.Component ?? {}).length >= 1) {
