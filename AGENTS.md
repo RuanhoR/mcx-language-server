@@ -35,6 +35,7 @@ Tests live in `packages/*/__test__/**/*.spec.ts` (vitest). Run from the package'
 ## Architecture notes
 
 - `@mbler/mcx-server` exports `createMCXLanguagePlugin(ts)` and `createMCXVirtualCode(snapshot)` from `packages/server/src/index.ts`.
+- **`@mbler/mcx-server` is consumed by the `mcx-tsc` package in the `mcx-core` repo** (the standalone type-checker split out of `mbler`) — it calls `createMCXLanguagePlugin` to type-check `.mcx` files. Keep the exported plugin API backwards-compatible; a breaking change there requires coordinating a `mcx-tsc` release.
 - The language server binary entry is `packages/server/src/server.ts` (build target in rolldown config).
 - `@mbler/mcx-ts-plugin` wraps `createMCXLanguagePlugin` via Volar's `createLanguageServicePlugin` helper. Published as CommonJS.
 - The VS Code extension bundles the server dist and TypeScript lib types into `dist/server/` via the `copyServerDist()` rolldown plugin.
