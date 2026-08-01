@@ -6,23 +6,13 @@ import { createRequire } from "node:module"
 import { rm } from "node:fs/promises"
 const _require = createRequire(import.meta.url)
 
-function copyServerDist() {
+function copyTypeScriptLibs() {
   return {
-    name: "copy-server-dist",
+    name: "copy-typescript-libs",
     closeBundle() {
-      const serverPkg = path.dirname(path.dirname(_require.resolve("@mbler/mcx-server")))
-      const src = path.join(serverPkg, "dist")
-      const dest = "dist/server"
-      if (fs.existsSync(src)) {
-        fs.cpSync(src, dest, {
-          recursive: true,
-          force: true,
-          filter: f => !/\.map$|^index\./.test(path.basename(f)),
-        })
-      }
       const tsPkg = path.dirname(_require.resolve("typescript/package.json"))
       const tsLibSrc = path.join(tsPkg, "lib")
-      const tsLibDest = path.join(dest, "lib")
+      const tsLibDest = "dist/server/lib"
       if (fs.existsSync(tsLibSrc)) {
         fs.cpSync(tsLibSrc, tsLibDest, {
           recursive: true,
@@ -63,6 +53,28 @@ function inlineBabelRequires() {
   }
 }
 
+function shimServerGlobals() {
+  return {
+    name: "shim-server-globals",
+    renderChunk(code, chunk) {
+      if (chunk.fileName !== "server.js") return null
+      const lines = code.split("\n")
+      let lastImport = -1
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith("import ")) lastImport = i
+      }
+      if (lastImport === -1) return null
+      const shims = `import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
+var __dirname = dirname(fileURLToPath(import.meta.url));
+var __filename = __dirname + '/lib/typescript.js';
+`
+      lines.splice(lastImport + 1, 0, shims)
+      return lines.join("\n")
+    },
+  }
+}
+
 const common = {
   input: {
     extension: "./src/extension.ts",
@@ -97,7 +109,7 @@ export default defineConfig([
       async buildStart() {
         await rm('./dist', { recursive: true, force: true })
       }
-    }, inlineBabelRequires(), copyServerDist()],
+    }, inlineBabelRequires()],
   },
   {
     input: "../../packages/ts-plugin/src/index.ts",
@@ -115,5 +127,18 @@ export default defineConfig([
       },
     },
     plugins: [inlineBabelRequires(), createPluginPack()],
+  },
+  {
+    input: "../../packages/server/src/server.ts",
+    output: {
+      file: "./dist/server/server.js",
+      format: "esm",
+      sourcemap: false,
+    },
+    platform: "node",
+    external: [
+      /^node:/,
+    ],
+    plugins: [inlineBabelRequires(), shimServerGlobals(), copyTypeScriptLibs()],
   },
 ])
