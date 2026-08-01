@@ -461,7 +461,7 @@ export class MCXVirtualCode implements VirtualCode {
     if (compileData?.strLoc?.Event?.isLoad) {
       type = 'event'
     }
-    if (compileData?.strLoc?.UI || (compileData?.strLoc as any)?.Form) {
+    if (compileData?.strLoc?.UI || (compileData?.strLoc as { Form?: unknown } | undefined)?.Form) {
       type = 'ui'
     }
     if (Object.keys(compileData?.strLoc?.Component ?? {}).length >= 1) {
