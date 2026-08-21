@@ -34,8 +34,8 @@ const TAG_COMPLETIONS = ['script', 'Event', 'Component', 'Ui', 'Form']
 const SCRIPT_LANG_VALUES = ['ts', 'js']
 const UI_LAYOUT_TYPES = ['input', 'textField', 'toggle', 'dropdown', 'slider', 'button', 'label', 'body', 'header', 'title', 'divider', 'spacer', 'close-button']
 const FORM_LAYOUT_TYPES = ['input', 'dropdown', 'submit', 'toggle', 'slider', 'button', 'button-m', 'body', 'divider', 'title']
-const COMPONENT_PARENT_TAGS = ['items', 'blocks', 'entities']
-const COMPONENT_CHILD_TAGS = ['item', 'block', 'entity']
+const COMPONENT_PARENT_TAGS = ['items', 'blocks', 'entities', 'features', 'featureRules', 'spawnRules', 'recipes', 'itemCatalog']
+const COMPONENT_CHILD_TAGS = ['item', 'block', 'entity', 'feature', 'featureRule', 'spawnRule', 'recipe', 'itemCatalog']
 const MCX_EXTENSION_ID = 'ruanhor.mcx-vscode-client'
 let client: LanguageClient | undefined
 patchTypeScriptExtension()
@@ -261,6 +261,16 @@ function getChildTagCompletions(parentTag: string): string[] {
       return ['block']
     case 'entities':
       return ['entity']
+    case 'features':
+      return ['feature']
+    case 'featureRules':
+      return ['featureRule']
+    case 'spawnRules':
+      return ['spawnRule']
+    case 'recipes':
+      return ['recipe']
+    case 'itemCatalog':
+      return ['itemCatalog']
     case 'Ui':
       return UI_LAYOUT_TYPES
     case 'Form':
@@ -381,6 +391,7 @@ function getAttributeCompletions(tagName: string, linePrefix: string): Completio
     addAttr('id', 'Component item identifier')
     addAttr('@before', 'Execute before main logic')
     addAttr('@after', 'Execute after main logic')
+    addAttr('type', 'Component type (e.g., ore_feature, shaped, shapeless)')
   } else if (UI_LAYOUT_TYPES.includes(tagName) || FORM_LAYOUT_TYPES.includes(tagName)) {
     addAttr('tip', 'Tooltip text')
     addAttr(':tip', 'Dynamic tooltip expression')
@@ -580,15 +591,24 @@ function provideMCXHover(
     const tagDocs: Record<string, string> = {
       script: 'Script block for embedded TypeScript/JavaScript code.\n\n**Attributes:** `lang`, `id`, `@before`, `@after`\n**Languages:** `ts`, `js`',
       Event: 'Event definition block for Minecraft event handlers.\n\nDefines event-driven behavior using Minecraft events.\n\n**Attributes:** `id`, `@before`, `@after`\n\n**Contents:** Subscribe to events with `subscribe("eventName", handler)`.',
-      Component: 'Component definition block.\n\nDefines a reusable component with custom items, blocks, and entities.\n\n**Attributes:** `id`\n\n**Children:** `<items>`, `<blocks>`, `<entities>`',
+      Component: 'Component definition block.\n\nDefines a reusable component with custom items, blocks, entities, features, feature rules, spawn rules, and recipes.\n\n**Attributes:** `id`\n\n**Children:** `<items>`, `<blocks>`, `<entities>`, `<features>`, `<featureRules>`, `<spawnRules>`, `<recipes>`, `<itemCatalog>`',
       Ui: 'UI definition block.\n\nDefines a reactive CustomForm-based UI layout.\n\n**Attributes:** `id`, `setup`\n\n**Children:** `input`, `textField`, `toggle`, `dropdown`, `slider`, `button`, `label`, `body`, `header`, `title`, `divider`, `spacer`, `close-button`',
       Form: 'Form definition block.\n\nDefines a legacy FormData-based UI (ModalFormData/ActionFormData/MessageFormData).\n\n**Attributes:** `id`, `type` (`modal`/`action`/`message`)',
       items: 'Item definitions container.\n\nWraps one or more `<item>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
       blocks: 'Block definitions container.\n\nWraps one or more `<block>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
       entities: 'Entity definitions container.\n\nWraps one or more `<entity>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
+      features: 'Feature definitions container.\n\nWraps one or more `<feature>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
+      featureRules: 'Feature rule definitions container.\n\nWraps one or more `<featureRule>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
+      spawnRules: 'Spawn rule definitions container.\n\nWraps one or more `<spawnRule>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
+      recipes: 'Recipe definitions container.\n\nWraps one or more `<recipe>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
+      itemCatalog: 'Item catalog definitions container.\n\nWraps one or more `<itemCatalog>` definitions in a Component.\n\n**Attributes:** `id`, `@before`, `@after`',
       item: 'Custom item definition.\n\nDefines a custom Minecraft item with properties.\n\n**Attributes:** `id`, `@before`, `@after`',
       block: 'Custom block definition.\n\nDefines a custom Minecraft block with properties.\n\n**Attributes:** `id`, `@before`, `@after`',
       entity: 'Custom entity definition.\n\nDefines a custom Minecraft entity with properties.\n\n**Attributes:** `id`, `@before`, `@after`',
+      feature: 'Custom feature definition.\n\nDefines a Minecraft feature (e.g., ore_feature) with properties.\n\n**Attributes:** `id`, `@before`, `@after`',
+      featureRule: 'Custom feature rule definition.\n\nDefines a feature rule with placement conditions.\n\n**Attributes:** `id`, `@before`, `@after`',
+      spawnRule: 'Custom spawn rule definition.\n\nDefines spawn conditions for entities.\n\n**Attributes:** `id`, `@before`, `@after`',
+      recipe: 'Custom recipe definition.\n\nDefines a crafting recipe.\n\n**Attributes:** `id`, `@before`, `@after`',
       input: 'Text input field.\n\n**Attributes:** `placeholderText`, `default`, `value`, `tip`, `disabled`, `visible`',
       textField: 'Text input field (alias for `input`).\n\n**Attributes:** `placeholderText`, `default`, `value`, `tip`, `disabled`, `visible`',
       toggle: 'Toggle/switch control.\n\n**Attributes:** `default`, `value`, `tip`, `disabled`, `visible`',
