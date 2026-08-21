@@ -1,6 +1,6 @@
 {
   "name": "@mbler/mcx-server",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "MCX Language Server",
   "engines": {
     "node": ">=20"
@@ -36,14 +36,14 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@babel/parser": "^7.24.0",
     "@mbler/mcx": "0.0.4-rc.1",
     "@mbler/mcx-core": "0.1.2-rc.13",
     "@mbler/mcx-types": "^0.0.4-rc.2",
-    "@babel/parser": "^7.24.0",
     "@volar/language-core": "^2.4.28",
     "@volar/language-server": "^2.4.28",
-    "volar-service-typescript": "^0.0.70",
     "typescript": "5.9.3",
+    "volar-service-typescript": "^0.0.70",
     "vscode-languageserver": "^9.0.1"
   },
   "bin": {
