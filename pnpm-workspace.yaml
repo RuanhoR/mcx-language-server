@@ -5,5 +5,5 @@ allowBuilds:
   '@vscode/vsce-sign': true
   keytar: true
   simple-git-hooks: true
-minimumReleaseAgeExclude:
-  - '@mbler/mcx-core@0.1.2-rc.13'
+minimumReleaseAge: 0
+onlyBuiltDependencies: []
