@@ -2,3 +2,4 @@ src
 tsconfig.json
 rolldown.config.mjs
 changelog
+*.tgz
