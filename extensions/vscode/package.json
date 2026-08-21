@@ -24,7 +24,7 @@
   "main": "dist/extension.js",
   "types": "dist/extension.d.ts",
   "scripts": {
-    "build": "rolldown -c && node scripts/copy-bundles.mjs",
+    "build": "rolldown -c",
     "pack": "npx @vscode/vsce package --allow-star-activation",
     "test": "pnpm build && cd test && pnpm test",
     "type-check": "tsc --noEmit",

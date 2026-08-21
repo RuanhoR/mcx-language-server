@@ -14,8 +14,6 @@
     "format": "prettier \"./packages/**/src/**/*.ts\" \"./packages/**/__test__/**/*.ts\" \"./extensions/**/src/**/*.ts\" \"./eslint.config.js\" \"./vitest.config.ts\" --write",
     "test": "vitest run",
     "build": "pnpm -r build",
-    "build:ext": "pnpm --filter @mbler/mcx-server build:ext && pnpm --filter @mbler/mcx-ts-plugin build:ext && pnpm --filter mcx-vscode-client build",
-    "build:all": "pnpm build && pnpm build:ext",
     "check": "pnpm test && pnpm lint:packages && pnpm -r type-check"
   },
   "keywords": [],
