@@ -423,7 +423,7 @@ export class MCXVirtualCode implements VirtualCode {
     chunks.push('declare const __mcx_world: import("@minecraft/server").World;')
 
     let extendsIndex = 0
-    for (const [key, value] of Object.entries(subscribe)) {
+    for (const [key, value] of Object.entries(subscribe ?? {})) {
       if (key === 'McxExtendsBy') {
         for (const extFile of value.split(',').map(s => s.trim())) {
           if (!extFile) continue

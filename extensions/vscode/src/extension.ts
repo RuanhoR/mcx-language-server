@@ -67,21 +67,17 @@ function getCachedAST(source: string): { tags: MCXTagNode[]; compileData: any } 
 }
 
 export function activate(context: ExtensionContext): void {
-  console.error('[MCX] Extension activating...')
-
   client = createMCXLanguageClient(context);
-  console.error("[MCX] Starting language client...");
-  client.start().then(() => {
-    console.error("[MCX] Language client ready");
-  }).catch((e) => {
-    console.error("[MCX] Language client failed to start:", e);
+  client.start().catch((e: Error) => {
     window.showErrorMessage(`MCX language server failed to start: ${e.message}`);
   });
 
-  setTimeout(() => {
-    console.error("[MCX] Restarting tsserver to apply monkey-patch...")
-    commands.executeCommand('typescript.restartTsServer')
+  const tsserverRestartTimer = setTimeout(() => {
+    void commands.executeCommand('typescript.restartTsServer')
   }, 3000)
+  context.subscriptions.push({
+    dispose: () => clearTimeout(tsserverRestartTimer),
+  })
 
   const formattingProvider: DocumentFormattingEditProvider = {
     provideDocumentFormattingEdits(document, options) {
@@ -163,16 +159,18 @@ export function activate(context: ExtensionContext): void {
     },
   })
 
-  workspace.onDidSaveTextDocument(document => {
-    if (document.languageId === 'mcx' || document.languageId === 'typescript' || document.languageId === 'javascript' || document.languageId === 'json' || document.languageId === 'jsonc') {
-      client?.sendNotification('workspace/didChangeWatchedFiles', {
-        changes: [{ uri: document.uri.toString(), type: 2 }],
-      })
-      // Redundant safety net: ensures project refresh even if Volar's file watcher
-      // chain drops the workspace/didChangeWatchedFiles notification
-      client?.sendNotification('mcx/fileChanged', { uri: document.uri.toString() })
-    }
-  })
+  context.subscriptions.push(
+    workspace.onDidSaveTextDocument(document => {
+      if (document.languageId === 'mcx' || document.languageId === 'typescript' || document.languageId === 'javascript' || document.languageId === 'json' || document.languageId === 'jsonc') {
+        client?.sendNotification('workspace/didChangeWatchedFiles', {
+          changes: [{ uri: document.uri.toString(), type: 2 }],
+        })
+        // Redundant safety net: ensures project refresh even if Volar's file watcher
+        // chain drops the workspace/didChangeWatchedFiles notification
+        client?.sendNotification('mcx/fileChanged', { uri: document.uri.toString() })
+      }
+    }),
+  )
 }
 
 export async function deactivate(): Promise<void> {
@@ -185,7 +183,6 @@ export async function deactivate(): Promise<void> {
 }
 
 function patchTypeScriptExtension(): void {
-  console.error('[MCX] patchTypeScriptExtension called')
   const mcxExtension = extensions.getExtension(MCX_EXTENSION_ID)
   if (mcxExtension) {
     mcxExtension.packageJSON.contributes.typescriptServerPlugins = [
@@ -195,7 +192,6 @@ function patchTypeScriptExtension(): void {
       },
     ]
   }
-  console.error('[MCX] patchTypeScriptExtension done')
 }
 
 async function restartLanguageServer(context: ExtensionContext): Promise<void> {
@@ -234,7 +230,9 @@ function getParentTagContext(
   const source = document.getText()
   const offset = document.offsetAt(position)
   const beforeCursor = source.slice(0, offset)
-  const tags = beforeCursor.match(/<([A-Za-z][\w:-]*)[^>]*>/g)
+  // Include closing tags (`</tag>`) so they pop the open-tag stack; otherwise
+  // closed siblings stay on the stack and the parent context is wrong.
+  const tags = beforeCursor.match(/<\/?([A-Za-z][\w:-]*)[^>]*>/g)
   if (!tags) return undefined
   const openStack: string[] = []
   for (const tag of tags) {
@@ -475,7 +473,7 @@ function provideScriptCompletions(
     const { tags } = getCachedAST(source)
     const eventTag = tags.find(t => t.name === 'Event')
     if (eventTag) {
-      const eventOn = typeof eventTag.arr['@before'] === 'string' ? 'before' : 'after'
+      const eventOn = typeof eventTag.arr?.['@before'] === 'string' ? 'before' : 'after'
       const events = getMinecraftEvents(eventOn)
       for (const evt of events) {
         const item = new CompletionItem(evt, CompletionItemKind.Event)
@@ -800,7 +798,7 @@ function provideMCXDefinition(
 
   const colInLine = offset - lineStartOffset
   const valueStart = eqIndex + 1
-  if (colInLine <= valueStart) return undefined
+  if (colInLine < valueStart) return undefined
 
   const valueMatch = currentLine.slice(valueStart).match(/(\w+)/)
   if (!valueMatch) return undefined

@@ -66,15 +66,8 @@ function patchFileSystemForDirtyUris(): void {
   };
 }
 
-  connection.onInitialize((params) => {
-  console.error("[MCX] onInitialize called");
-  console.error("[MCX] Client workspace.didChangeWatchedFiles:", JSON.stringify(params.capabilities.workspace?.didChangeWatchedFiles));
-
+connection.onInitialize((params) => {
   const typescriptServices = createTypeScriptServices(ts);
-  console.error("[MCX] TypeScript services created, capabilities:", Object.keys(typescriptServices));
-
-  console.error("[MCX] MCX plugin extraFileExtensions:", JSON.stringify(mcxLanguagePlugin.typescript?.extraFileExtensions));
-  console.error("[MCX] MCX plugin has typescript:", !!mcxLanguagePlugin.typescript);
 
   const extraFileExtensionsList: Array<{ extension: string; isMixedContent: boolean; scriptKind: number }> = [];
   if (mcxLanguagePlugin.typescript?.extraFileExtensions) {
@@ -83,54 +76,27 @@ function patchFileSystemForDirtyUris(): void {
 
   project = createTypeScriptProject(ts, undefined, async () => ({
     languagePlugins: [mcxLanguagePlugin],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setup({ project: proj }: any) {
-        const host = proj.typescript.languageServiceHost as import('typescript').LanguageServiceHost & { getExtraFileExtensions?: () => { extension: string; isMixedContent: boolean; scriptKind: number }[] };
-        if (host && extraFileExtensionsList.length) {
-          const origCompilationSettings = host.getCompilationSettings?.bind(host);
-          if (origCompilationSettings) {
-            host.getCompilationSettings = () => {
-              const opts = origCompilationSettings();
-              opts.allowNonTsExtensions ??= true;
-              opts.allowArbitraryExtensions ??= true;
-              return opts;
-            };
-          }
-          host.getExtraFileExtensions = () => extraFileExtensionsList;
-
-          // Patch getScriptSnapshot to debug .mcx file loading
-          const origGetScriptSnapshot = host.getScriptSnapshot.bind(host);
-          host.getScriptSnapshot = (fileName: string) => {
-            const result = origGetScriptSnapshot(fileName);
-            if (fileName.includes('.mcx')) {
-              console.error("[MCX] getScriptSnapshot:", fileName, "result:", result ? "found" : "undefined");
-              if (result) {
-                console.error("[MCX] getScriptSnapshot text:", result.getText(0, Math.min(result.getLength(), 200)));
-              }
-            }
-            return result;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setup({ project: proj }: any) {
+      const host = proj.typescript.languageServiceHost as import('typescript').LanguageServiceHost & { getExtraFileExtensions?: () => { extension: string; isMixedContent: boolean; scriptKind: number }[] };
+      if (host && extraFileExtensionsList.length) {
+        const origCompilationSettings = host.getCompilationSettings?.bind(host);
+        if (origCompilationSettings) {
+          host.getCompilationSettings = () => {
+            const opts = origCompilationSettings();
+            opts.allowNonTsExtensions ??= true;
+            opts.allowArbitraryExtensions ??= true;
+            return opts;
           };
-
-          // Patch fileExists to debug .mcx detection
-          const origFileExists = host.fileExists.bind(host);
-          host.fileExists = (fileName: string) => {
-            const result = origFileExists(fileName);
-            if (fileName.includes('.mcx')) {
-              console.error("[MCX] fileExists:", fileName, "result:", result);
-            }
-            return result;
-          };
-
-          console.error("[MCX] setup: patched getScriptSnapshot, fileExists");
         }
-      },
+        host.getExtraFileExtensions = () => extraFileExtensionsList;
+      }
+    },
   }));
 
   const result = server.initialize(params, project, typescriptServices);
-  console.error("[MCX] server.initialize returned, capabilities:", Object.keys(result.capabilities));
 
   connection.onNotification("mcx/fileChanged", async (change: { uri: string }) => {
-    console.error("[MCX] mcx/fileChanged:", change.uri);
     dirtyUris.add(change.uri);
 
     // The extension already sends workspace/didChangeWatchedFiles before this
@@ -154,13 +120,9 @@ connection.onInitialized(() => {
   // Patch fileSystem so mcx/fileChanged can bypass caches
   patchFileSystemForDirtyUris();
 
-  // Set up didChangeWatchedFiles handler so Volar processes file changes.
-  console.error("[MCX] Calling watchFiles...");
   server.fileWatcher.watchFiles([
     "**/*.{mcx,ts,js,json}",
-  ]).then(() => {
-    console.error("[MCX] watchFiles succeeded");
-  }).catch((e) => {
+  ]).catch((e) => {
     console.error("[MCX] watchFiles failed:", e);
   });
 });
