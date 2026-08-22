@@ -6,19 +6,14 @@ import { createRequire } from "node:module"
 import { rm } from "node:fs/promises"
 const _require = createRequire(import.meta.url)
 
-function copyTypeScriptLibs() {
+function copyTypeScriptPackage() {
   return {
-    name: "copy-typescript-libs",
+    name: "copy-typescript-package",
     closeBundle() {
-      const tsPkg = path.dirname(_require.resolve("typescript/package.json"))
-      const tsLibSrc = path.join(tsPkg, "lib")
-      const tsLibDest = "dist/server/lib"
-      if (fs.existsSync(tsLibSrc)) {
-        fs.cpSync(tsLibSrc, tsLibDest, {
-          recursive: true,
-          force: true,
-          filter: f => fs.statSync(f).isDirectory() || /\.d\.ts$/.test(f),
-        })
+      const tsPkgDir = path.dirname(_require.resolve("typescript/package.json"))
+      const tsDest = "dist/server/node_modules/typescript"
+      if (fs.existsSync(tsPkgDir)) {
+        fs.cpSync(tsPkgDir, tsDest, { recursive: true, force: true })
       }
     },
   }
@@ -78,6 +73,7 @@ export default defineConfig({
   },
   external: [
     "vscode",
+    "typescript",
     /^node:/,
   ],
   plugins: [{
@@ -85,5 +81,5 @@ export default defineConfig({
     async buildStart() {
       await rm('./dist', { recursive: true, force: true })
     }
-  }, inlineBabelRequires(), createPluginPack(), copyTypeScriptLibs()],
+  }, inlineBabelRequires(), createPluginPack(), copyTypeScriptPackage()],
 })
