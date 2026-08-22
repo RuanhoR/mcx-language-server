@@ -11,7 +11,7 @@ function copyTypeScriptPackage() {
     name: "copy-typescript-package",
     closeBundle() {
       const tsPkgDir = path.dirname(_require.resolve("typescript/package.json"))
-      const tsDest = "dist/server/node_modules/typescript"
+      const tsDest = "dist/node_modules/typescript"
       if (fs.existsSync(tsPkgDir)) {
         fs.cpSync(tsPkgDir, tsDest, { recursive: true, force: true })
       }
