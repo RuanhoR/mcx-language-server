@@ -9,6 +9,7 @@ import {
   MarkdownString,
   Position,
   Range,
+  SnippetString,
   commands,
   extensions,
   languages,
@@ -31,6 +32,21 @@ type MCXPosition = mcx.PubType.MCXPosition
 type MCXTagNode = mcx.PubType.ParsedTagNode
 
 const TAG_COMPLETIONS = ['script', 'Event', 'Component', 'Ui', 'Form']
+const CONTAINER_TAGS = new Set([
+  'Component',
+  'Ui',
+  'Form',
+  'Event',
+  'script',
+  'items',
+  'blocks',
+  'entities',
+  'features',
+  'featureRules',
+  'spawnRules',
+  'recipes',
+  'itemCatalog',
+])
 const SCRIPT_LANG_VALUES = ['ts', 'js']
 const UI_LAYOUT_TYPES = ['input', 'textField', 'toggle', 'dropdown', 'slider', 'button', 'label', 'body', 'header', 'title', 'divider', 'spacer', 'close-button']
 const FORM_LAYOUT_TYPES = ['input', 'dropdown', 'submit', 'toggle', 'slider', 'button', 'button-m', 'body', 'divider', 'title']
@@ -223,30 +239,54 @@ async function ensureMCXLanguage(document: TextDocument): Promise<void> {
   }
 }
 
+interface OpenTagEntry {
+  name: string
+  line: number
+}
+
+function getOpenTagEntries(
+  document: TextDocument,
+  untilOffset: number,
+): OpenTagEntry[] {
+  const source = document.getText()
+  const beforeCursor = source.slice(0, untilOffset)
+  const entries: OpenTagEntry[] = []
+  // Include closing tags (`</tag>`) so they pop the open-tag stack; otherwise
+  // closed siblings stay on the stack and the parent context is wrong.
+  const tagRegex = /<\/?([A-Za-z][\w:-]*)[^>]*>/g
+  let match: RegExpExecArray | null
+  while ((match = tagRegex.exec(beforeCursor)) !== null) {
+    if (match[0].startsWith('</')) {
+      const name = match[1]
+      if (entries.length > 0 && entries[entries.length - 1]!.name === name) {
+        entries.pop()
+      }
+    } else if (!match[0].endsWith('/>')) {
+      entries.push({
+        name: match[1]!,
+        line: document.positionAt(match.index).line,
+      })
+    }
+  }
+  return entries
+}
+
 function getParentTagContext(
   document: TextDocument,
   position: Position,
 ): string | undefined {
-  const source = document.getText()
   const offset = document.offsetAt(position)
-  const beforeCursor = source.slice(0, offset)
-  // Include closing tags (`</tag>`) so they pop the open-tag stack; otherwise
-  // closed siblings stay on the stack and the parent context is wrong.
-  const tags = beforeCursor.match(/<\/?([A-Za-z][\w:-]*)[^>]*>/g)
-  if (!tags) return undefined
-  const openStack: string[] = []
-  for (const tag of tags) {
-    if (tag.startsWith('</')) {
-      const name = tag.match(/<\/([\w:-]+)/)?.[1]
-      if (name && openStack.length > 0 && openStack[openStack.length - 1] === name) {
-        openStack.pop()
-      }
-    } else if (!tag.endsWith('/>')) {
-      const name = tag.match(/<([\w:-]+)/)?.[1]
-      if (name) openStack.push(name)
-    }
+  const entries = getOpenTagEntries(document, offset)
+  if (entries.length === 0) return undefined
+  const top = entries[entries.length - 1]!
+  // While typing top-down the previous sibling is usually still unclosed
+  // (e.g. `<title>text` without `</title>` yet). If the innermost open tag
+  // is a leaf and the cursor is on a later line, the cursor is actually a
+  // SIBLING of that tag — completions belong to its parent instead.
+  if (!CONTAINER_TAGS.has(top.name) && position.line > top.line) {
+    return entries.length >= 2 ? entries[entries.length - 2]!.name : undefined
   }
-  return openStack.length > 0 ? openStack[openStack.length - 1] : undefined
+  return top.name
 }
 
 function getChildTagCompletions(parentTag: string): string[] {
@@ -319,9 +359,11 @@ function provideMCXCompletions(
     const suggestions = parentContext
       ? getChildTagCompletions(parentContext)
       : TAG_COMPLETIONS
+    // The trigger char '<' is already in the buffer when this branch matches;
+    // inserting `name>$0</name>` right after it yields `<name></name>`.
     return suggestions.map(name => {
       const item = new CompletionItem(name, CompletionItemKind.Keyword)
-      item.insertText = name
+      item.insertText = new SnippetString(`${name}>$0</${name}>`)
       item.detail = parentContext ? `${parentContext} child` : 'MCX tag'
       return item
     })
