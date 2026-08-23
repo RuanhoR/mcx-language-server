@@ -124,6 +124,7 @@ export default defineConfig([
         }
       },
       inlineBabelRequires(),
+      createPluginPack(),
       writeTypescriptStub()
     ]
   },
