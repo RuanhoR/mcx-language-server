@@ -1,0 +1,56 @@
+{
+  "name": "mcx-tsc",
+  "version": "0.0.2-rc.2",
+  "description": "Type check for mcx",
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "lint": "eslint src --ext .js,.ts",
+    "lint:fix": "eslint src --ext .js,.ts --fix",
+    "build": "rolldown -c"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "minecraft",
+    "typescript",
+    "type-check"
+  ],
+  "repository": {
+    "directory": "/packages/mcx-tsc",
+    "type": "git",
+    "url": "https://github.com/RuanhoR/mcx-language-server"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "types": "./dist/index.d.ts",
+  "author": "ruanhor",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "mcx-tsc": "bin/mcx-tsc.cjs"
+  },
+  "dependencies": {
+    "@mbler/mcx-server": "workspace:*",
+    "@volar/language-core": "2.4.28",
+    "@volar/typescript": "2.4.28"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

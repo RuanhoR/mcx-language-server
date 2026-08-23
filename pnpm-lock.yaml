@@ -79,6 +79,21 @@ importers:
         specifier: ^9.0.1
         version: 9.0.1
 
+  packages/mcx-tsc:
+    dependencies:
+      '@mbler/mcx-server':
+        specifier: workspace:*
+        version: link:../server
+      '@volar/language-core':
+        specifier: 2.4.28
+        version: 2.4.28
+      '@volar/typescript':
+        specifier: 2.4.28
+        version: 2.4.28
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/server:
     dependencies:
       '@babel/parser':

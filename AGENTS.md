@@ -6,6 +6,7 @@
 packages/
   server/        @mbler/mcx-server   — Volar-based MCX language server (ESM, rolldown)
   ts-plugin/     @mbler/mcx-ts-plugin — TS Language Service plugin (CommonJS, tsc)
+  mcx-tsc/       mcx-tsc (unscoped)   — standalone MCX type-checker CLI (rolldown; moved from mcx-core)
 extensions/
   vscode/        mcx-vscode-client   — VS Code extension (CJS, rolldown + vsce)
 ```
@@ -18,6 +19,7 @@ Root is a pnpm workspace (v11.8.0). No lint config exists. Formatter is Prettier
 |---|---|---|---|---|
 | `packages/server` | `pnpm build` (rolldown) | `npx tsc --noEmit` | `pnpm test` (vitest) | — |
 | `packages/ts-plugin` | `pnpm build` (tsc) | `npx tsc --noEmit` | `pnpm test` (vitest) | — |
+| `packages/mcx-tsc` | `pnpm build` (rolldown) | `pnpm exec tsc --noEmit` | — (no tests) | — |
 | `extensions/vscode` | `pnpm build` (rolldown) | `pnpm run type-check` | `pnpm test` | `pnpm run pack` (vsce) |
 
 Root scripts: `pnpm prepare` (installs git hooks, run once after clone).
@@ -35,7 +37,7 @@ Tests live in `packages/*/__test__/**/*.spec.ts` (vitest). Run from the package'
 ## Architecture notes
 
 - `@mbler/mcx-server` exports `createMCXLanguagePlugin(ts)` and `createMCXVirtualCode(snapshot)` from `packages/server/src/index.ts`.
-- **`@mbler/mcx-server` is consumed by the `mcx-tsc` package in the `mcx-core` repo** (the standalone type-checker split out of `mbler`) — it calls `createMCXLanguagePlugin` to type-check `.mcx` files. Keep the exported plugin API backwards-compatible; a breaking change there requires coordinating a `mcx-tsc` release.
+- **`mcx-tsc` lives in this repo** (`packages/mcx-tsc`, moved from `mcx-core`) and consumes `@mbler/mcx-server` via a `workspace:*` dependency — it calls `createMCXLanguagePlugin` to type-check `.mcx` files. Keep the exported plugin API backwards-compatible; a breaking change there requires coordinating a `mcx-tsc` release.
 - The language server binary entry is `packages/server/src/server.ts` (build target in rolldown config).
 - `@mbler/mcx-ts-plugin` wraps `createMCXLanguagePlugin` via Volar's `createLanguageServicePlugin` helper. Published as CommonJS.
 - The VS Code extension bundles the server dist and TypeScript lib types into `dist/server/` via the `copyServerDist()` rolldown plugin.
