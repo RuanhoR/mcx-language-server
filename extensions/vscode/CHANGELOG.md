@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3] - 2026-08-23
+
+### Features
+
+- Loot table (`<loot_tables>`) and trade table (`<trade_tables>`) component groups; tables emit to `loot_tables/` and `trading/`
+- Completions for the new groups and child tags
+
 ## [1.1.2] - 2026-08-23
 
 ### Features

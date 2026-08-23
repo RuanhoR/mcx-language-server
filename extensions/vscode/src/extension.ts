@@ -50,8 +50,8 @@ const CONTAINER_TAGS = new Set([
 const SCRIPT_LANG_VALUES = ['ts', 'js']
 const UI_LAYOUT_TYPES = ['input', 'textField', 'toggle', 'dropdown', 'slider', 'button', 'label', 'body', 'header', 'title', 'divider', 'spacer', 'close-button']
 const FORM_LAYOUT_TYPES = ['input', 'dropdown', 'submit', 'toggle', 'slider', 'button', 'button-m', 'body', 'divider', 'title']
-const COMPONENT_PARENT_TAGS = ['items', 'blocks', 'entities', 'features', 'featureRules', 'spawnRules', 'recipes', 'itemCatalog']
-const COMPONENT_CHILD_TAGS = ['item', 'block', 'entity', 'feature', 'featureRule', 'spawnRule', 'recipe', 'itemCatalog']
+const COMPONENT_PARENT_TAGS = ['items', 'blocks', 'entities', 'features', 'featureRules', 'spawnRules', 'recipes', 'loot_tables', 'trade_tables', 'itemCatalog']
+const COMPONENT_CHILD_TAGS = ['item', 'block', 'entity', 'feature', 'featureRule', 'spawnRule', 'recipe', 'lootTable', 'tradeTable', 'itemCatalog']
 const MCX_EXTENSION_ID = 'ruanhor.mcx-vscode-client'
 let client: LanguageClient | undefined
 patchTypeScriptExtension()
