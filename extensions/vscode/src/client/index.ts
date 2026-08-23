@@ -1,4 +1,4 @@
-import { Uri, workspace, env, type ExtensionContext } from "vscode";
+import { Uri, workspace, env, extensions, type ExtensionContext } from "vscode";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
@@ -12,29 +12,28 @@ import { middleware as volarMiddleware } from "@volar/vscode";
 /**
  * Locate the TypeScript module shipped inside VS Code itself so the language
  * server can reuse it instead of bundling a multi-megabyte copy.
+ * Mirrors Volar's resolveTsdkPath(): appRoot first, Theia fallback second.
  */
-function locateVscodeTypeScript(): string | undefined {
-  const candidates = [
-    path.join(
-      env.appRoot,
-      "extensions",
-      "node_modules",
-      "typescript",
-      "lib",
-      "typescript.js"
-    ),
-    path.join(env.appRoot, "node_modules", "typescript", "lib", "typescript.js"),
-    path.join(
-      env.appRoot,
-      "extensions",
-      "typescript-language-features",
-      "node_modules",
-      "typescript",
-      "lib",
-      "typescript.js"
-    ),
-  ];
-  return candidates.find(candidate => fs.existsSync(candidate));
+function resolveTsdkPath(): string | undefined {
+  const vscodeTsdk = path.join(
+    env.appRoot,
+    "extensions",
+    "node_modules",
+    "typescript",
+    "lib"
+  );
+  if (fs.existsSync(vscodeTsdk)) {
+    return vscodeTsdk;
+  }
+  const tsExt = extensions.getExtension("vscode.typescript-language-features");
+  if (tsExt) {
+    // Eclipse Theia layout
+    const theiaTsdk = path.join(tsExt.extensionPath, "deps", "typescript", "lib");
+    if (fs.existsSync(theiaTsdk)) {
+      return theiaTsdk;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -48,21 +47,25 @@ export function createMCXLanguageClient(context: ExtensionContext): LanguageClie
     "server.js"
   ).fsPath;
 
-  const tsModule = locateVscodeTypeScript();
+  const tsdk = resolveTsdkPath();
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
-  if (tsModule) {
-    childEnv.MCX_TYPESCRIPT_PATH = tsModule;
+  if (tsdk) {
+    childEnv.MCX_TYPESCRIPT_PATH = path.join(tsdk, "typescript.js");
+    // Also expose to the extension host for the lazy @mbler/mcx-core load.
+    process.env.MCX_TYPESCRIPT_PATH = path.join(tsdk, "typescript.js");
   }
 
   const serverOptions: ServerOptions = {
     run: {
       module: serverModule,
       transport: TransportKind.ipc,
+      args: tsdk ? ["--tsdk=" + tsdk.replace(/\\/g, "/")] : undefined,
       options: { env: childEnv },
     },
     debug: {
       module: serverModule,
       transport: TransportKind.ipc,
+      args: tsdk ? ["--tsdk=" + tsdk.replace(/\\/g, "/")] : undefined,
       options: {
         execArgv: ["--nolazy", "--inspect=6010"],
         env: childEnv,

@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.2] - 2026-08-23
+
+### Features
+
+- Reuses the TypeScript shipped with VS Code (no longer bundled; vsix 4.87 MB → ~1 MB)
+- Smarter child-tag completions after unclosed siblings inside `<Ui>` / `<Component>` groups
+- Tag-name completion inserts `<xxx></xxx>` snippets
+
+### Fixes
+
+- "Cannot find name 'Record' / 'Object'" — lib files now resolve through VS Code's own TypeScript
+- Extension activation failure caused by an eager `require('typescript')` in the vendor chunk
+
 ## [1.1.0] - Unreleased
 
 ### Fixes

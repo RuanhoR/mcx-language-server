@@ -1,4 +1,9 @@
-import * as mcx from "@mbler/mcx-core";
+import type * as mcx from "@mbler/mcx-core";
+
+let mcxModulePromise: Promise<typeof mcx> | undefined
+function loadMcx(): Promise<typeof mcx> {
+  return (mcxModulePromise ??= import("@mbler/mcx-core"))
+}
 import {
   Position,
   Range,
@@ -29,12 +34,12 @@ interface MCXTagNode {
  * Format MCX text by rebuilding output from parsed AST nodes.
  * This keeps structural formatting deterministic and stable.
  */
-export function formatMCXDocument(
+export async function formatMCXDocument(
   document: TextDocument,
   options: FormattingOptions,
-): TextEdit[] {
+): Promise<TextEdit[]> {
   const source = document.getText();
-  const formatted = formatMCXText(source, options);
+  const formatted = await formatMCXText(source, options);
   if (formatted === source) {
     return [];
   }
@@ -43,9 +48,9 @@ export function formatMCXDocument(
   return [TextEdit.replace(new Range(new Position(0, 0), end), formatted)];
 }
 
-export function formatMCXText(source: string, options: FormattingOptions): string {
+export async function formatMCXText(source: string, options: FormattingOptions): Promise<string> {
   const indentUnit = options.insertSpaces ? " ".repeat(options.tabSize) : "\t";
-  const ast = parseWithComments(source);
+  const ast = await parseWithComments(source);
   if (!ast) {
     return source;
   }
@@ -57,9 +62,10 @@ export function formatMCXText(source: string, options: FormattingOptions): strin
   return blocks.join("\n\n").trimEnd() + "\n";
 }
 
-function parseWithComments(source: string): MCXTagNode[] | null {
+async function parseWithComments(source: string): Promise<MCXTagNode[] | null> {
   try {
-    const parser = new (mcx as any).AST.tag(source, true);
+    const core = await loadMcx();
+    const parser = new (core as any).AST.tag(source, true);
     return parser.parseAST() as MCXTagNode[];
   } catch {
     return null;

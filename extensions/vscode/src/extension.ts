@@ -23,7 +23,7 @@ import {
   type TextDocument,
 } from 'vscode'
 import * as path from 'node:path'
-import * as mcx from '@mbler/mcx-core'
+import type * as mcx from '@mbler/mcx-core'
 import type { LanguageClient } from 'vscode-languageclient/node.js'
 import { createMCXLanguageClient } from './client/index.js'
 import { formatMCXDocument } from './format/index.js'
@@ -59,7 +59,16 @@ patchTypeScriptExtension()
 const astCache = new Map<string, { tags: MCXTagNode[]; compileData: any; timestamp: number }>()
 const AST_CACHE_TTL = 500
 
-function getCachedAST(source: string): { tags: MCXTagNode[]; compileData: any } {
+// Lazy-load @mbler/mcx-core on first provider call.  A static import would
+// drag `typescript` (a mcx-core dependency) into the eager vendor chunk,
+// breaking extension activation in installed environments where TS resolves
+// through our stub.
+let mcxModulePromise: Promise<typeof mcx> | undefined
+function loadMcx(): Promise<typeof mcx> {
+  return (mcxModulePromise ??= import('@mbler/mcx-core'))
+}
+
+async function getCachedAST(source: string): Promise<{ tags: MCXTagNode[]; compileData: any }> {
   const cached = astCache.get(source)
   const now = Date.now()
   if (cached && now - cached.timestamp < AST_CACHE_TTL) {
@@ -68,10 +77,13 @@ function getCachedAST(source: string): { tags: MCXTagNode[]; compileData: any } 
   let tags: MCXTagNode[] = []
   let compileData: any = undefined
   try {
-    tags = new (mcx as any).AST.tag(source).parseAST() as MCXTagNode[]
+    const core = await loadMcx()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tags = new (core as any).AST.tag(source).parseAST() as MCXTagNode[]
   } catch {}
   try {
-    compileData = (mcx as any).compiler.compileMCXFn(source)
+    const core = await loadMcx()
+    compileData = (core as any).compiler.compileMCXFn(source)
   } catch {}
   const result = { tags, compileData }
   astCache.set(source, { ...result, timestamp: now })
@@ -334,10 +346,10 @@ function getOpenTagStack(source: string): string[] {
   return stack
 }
 
-function provideMCXCompletions(
+async function provideMCXCompletions(
   document: TextDocument,
-  position: Position,
-): CompletionItem[] {
+  position: Position
+): Promise<CompletionItem[]> {
   const linePrefix = document
     .lineAt(position.line)
     .text.slice(0, position.character)
@@ -382,7 +394,7 @@ function provideMCXCompletions(
     })
   }
 
-  const scriptBlock = getScriptBlock(document.getText())
+  const scriptBlock = await getScriptBlock(document.getText())
   if (
     scriptBlock &&
     isInsideScriptBlockContent(document, position, scriptBlock)
@@ -484,12 +496,12 @@ function getAttributeCompletions(tagName: string, linePrefix: string): Completio
   return items
 }
 
-function provideScriptCompletions(
+async function provideScriptCompletions(
   document: TextDocument,
   position: Position,
   fullLine: string,
   linePrefix: string,
-): CompletionItem[] {
+): Promise<CompletionItem[]> {
   const completions: CompletionItem[] = []
 
   if (/import\s*$/.test(linePrefix) || /import\s+[\w$]*$/.test(linePrefix)) {
@@ -512,7 +524,7 @@ function provideScriptCompletions(
 
   if (/\.subscribe\(?["']?$/.test(linePrefix.trim())) {
     const source = document.getText()
-    const { tags } = getCachedAST(source)
+    const { tags } = await getCachedAST(source)
     const eventTag = tags.find(t => t.name === 'Event')
     if (eventTag) {
       const eventOn = typeof eventTag.arr?.['@before'] === 'string' ? 'before' : 'after'
@@ -608,14 +620,14 @@ function extractPropertyNames(body: string): string[] {
   return names
 }
 
-function provideMCXHover(
+async function provideMCXHover(
   document: TextDocument,
-  position: Position,
-): Hover | undefined {
+  position: Position
+): Promise<Hover | undefined> {
   const linePrefix = document
     .lineAt(position.line)
     .text.slice(0, position.character)
-  const hoverInfo = analyzeHoverPosition(document, position, linePrefix)
+  const hoverInfo = await analyzeHoverPosition(document, position, linePrefix)
 
   if (!hoverInfo) {
     return undefined
@@ -728,12 +740,12 @@ interface HoverInfo {
   attrValue?: string
 }
 
-function analyzeHoverPosition(
+async function analyzeHoverPosition(
   document: TextDocument,
   position: Position,
-  linePrefix: string,
-): HoverInfo | undefined {
-  const script = getScriptBlock(document.getText())
+  linePrefix: string
+): Promise<HoverInfo | undefined> {
+  const script = await getScriptBlock(document.getText())
   if (script && isInsideScriptBlock(document, position, script)) {
     return undefined
   }
@@ -809,15 +821,15 @@ function analyzeHoverPosition(
   return undefined
 }
 
-function provideMCXDefinition(
+async function provideMCXDefinition(
   document: TextDocument,
   position: Position,
   _token: CancellationToken,
-): Definition | DefinitionLink[] | undefined {
+): Promise<Definition | DefinitionLink[] | undefined> {
   const source = document.getText()
   const offset = document.offsetAt(position)
 
-  const { tags } = getCachedAST(source)
+  const { tags } = await getCachedAST(source)
   const eventTag = tags.find(t => t.name === 'Event')
   if (!eventTag) return undefined
 
@@ -851,7 +863,7 @@ function provideMCXDefinition(
     return undefined
   }
 
-  const script = getScriptBlock(source)
+  const script = await getScriptBlock(source)
   if (!script) return undefined
 
   const scriptSource = source.slice(script.start, script.end)
@@ -900,12 +912,13 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function getScriptBlock(
-  source: string,
-): { start: number; end: number } | undefined {
+async function getScriptBlock(
+  source: string
+): Promise<{ start: number; end: number } | undefined> {
   let parsed: MCXTagNode[] | undefined
   try {
-    parsed = new (mcx as any).AST.tag(source).parseAST() as MCXTagNode[]
+    const core = await loadMcx()
+    parsed = new (core as any).AST.tag(source).parseAST() as MCXTagNode[]
   } catch {
     return undefined
   }

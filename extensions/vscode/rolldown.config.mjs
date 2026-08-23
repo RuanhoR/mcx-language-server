@@ -21,7 +21,7 @@ function createPluginPack() {
 /**
  * Ship a tiny `typescript` stub instead of the real 20MB+ package.
  * At runtime it forwards to the TypeScript bundled with VS Code itself:
- * - server child process: MCX_TYPESCRIPT_PATH (set by the client)
+ * - server child process: MCX_TYPESCRIPT_PATH / --tsdk (set by the client)
  * - extension host: derived from process.execPath (<app>/resources/app)
  */
 function writeTypescriptStub() {
@@ -42,6 +42,11 @@ function writeTypescriptStub() {
           "function resolveTarget() {",
           "  const envPath = process.env.MCX_TYPESCRIPT_PATH",
           "  if (envPath && fs.existsSync(envPath)) return envPath",
+          "  const tsdkArg = process.argv.find(a => a.startsWith('--tsdk='))",
+          "  if (tsdkArg) {",
+          "    const candidate = tsdkArg.slice('--tsdk='.length).replace(/\\\\/g, '/') + '/typescript.js'",
+          "    if (fs.existsSync(candidate)) return candidate",
+          "  }",
           "  const exeDir = path.dirname(process.execPath)",
           "  const candidates = [",
           "    path.join(exeDir, 'resources', 'app', 'extensions', 'node_modules', 'typescript', 'lib', 'typescript.js'),",
@@ -72,40 +77,68 @@ function inlineBabelRequires() {
   }
 }
 
-export default defineConfig({
-  input: {
-    extension: "./src/extension.ts",
-    client: "./src/client/index.ts",
-    "ts-plugin": "./src/ts-plugin-entry.ts",
-    server: "./src/server-entry.ts",
-  },
-  output: {
-    dir: "./dist",
-    entryFileNames(chunkInfo) {
-      if (chunkInfo.name === "server") return "server/[name].js"
-      return "[name].js"
+const commonExternal = ["vscode", "typescript", /^node:/]
+
+export default defineConfig([
+  // Main extension-host + language-server build.  `@mbler/mcx-core` is only
+  // reachable through dynamic imports here, so it (and its typescript
+  // dependency) lands in a lazy chunk instead of the eager vendor chunk.
+  {
+    input: {
+      extension: "./src/extension.ts",
+      client: "./src/client/index.ts",
+      server: "./src/server-entry.ts"
     },
-    format: "cjs",
-    exports: "named",
-    minify: true,
-    manualChunks(id) {
-      if (id.includes("node_modules")) {
+    output: {
+      dir: "./dist",
+      entryFileNames(chunkInfo) {
+        if (chunkInfo.name === "server") return "server/[name].js"
+        return "[name].js"
+      },
+      format: "cjs",
+      exports: "named",
+      minify: true,
+      manualChunks(id) {
+        if (!id.includes("node_modules")) return undefined
+        if (
+          id.includes("@mbler/mcx-core") ||
+          id.includes("@mbler+mcx-core") ||
+          id.includes("@babel") ||
+          id.includes("+babel") ||
+          /[\\/]typescript[\\/]/.test(id)
+        ) {
+          return undefined
+        }
         if (id.includes("vscode-languageclient")) return "lsp-client"
         if (id.includes("vscode-languageserver")) return "lsp"
         if (id.includes("@volar") || id.includes("vscode-nls")) return "volar"
         return "vendor"
       }
     },
+    external: commonExternal,
+    plugins: [
+      {
+        name: "rm-old-dist",
+        async buildStart() {
+          await rm("./dist", { recursive: true, force: true })
+        }
+      },
+      inlineBabelRequires(),
+      writeTypescriptStub()
+    ]
   },
-  external: [
-    "vscode",
-    "typescript",
-    /^node:/,
-  ],
-  plugins: [{
-    name: "rm-old-dist",
-    async buildStart() {
-      await rm('./dist', { recursive: true, force: true })
-    }
-  }, inlineBabelRequires(), createPluginPack(), writeTypescriptStub()],
-})
+  // The tsserver plugin runs inside VS Code's own TypeScript process where
+  // `require('typescript')` resolves natively — keep it a standalone bundle.
+  {
+    input: { "ts-plugin": "./src/ts-plugin-entry.ts" },
+    output: {
+      dir: "./dist",
+      entryFileNames: "[name].js",
+      format: "cjs",
+      exports: "named",
+      minify: true
+    },
+    external: commonExternal,
+    plugins: [inlineBabelRequires()]
+  }
+])
