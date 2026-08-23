@@ -2,22 +2,7 @@
 import { defineConfig } from "rolldown"
 import path from "node:path"
 import fs from "node:fs"
-import { createRequire } from "node:module"
 import { rm } from "node:fs/promises"
-const _require = createRequire(import.meta.url)
-
-function copyTypeScriptPackage() {
-  return {
-    name: "copy-typescript-package",
-    closeBundle() {
-      const tsPkgDir = path.dirname(_require.resolve("typescript/package.json"))
-      const tsDest = "dist/node_modules/typescript"
-      if (fs.existsSync(tsPkgDir)) {
-        fs.cpSync(tsPkgDir, tsDest, { recursive: true, force: true })
-      }
-    },
-  }
-}
 
 function createPluginPack() {
   return {
@@ -29,7 +14,7 @@ function createPluginPack() {
         fs.mkdirSync(dir, { recursive: true })
       }
       fs.writeFileSync(entry, "module.exports = require('../../dist/ts-plugin.js').default;\n")
-    },
+    }
   }
 }
 
@@ -81,5 +66,5 @@ export default defineConfig({
     async buildStart() {
       await rm('./dist', { recursive: true, force: true })
     }
-  }, inlineBabelRequires(), createPluginPack(), copyTypeScriptPackage()],
+  }, inlineBabelRequires(), createPluginPack()],
 })
