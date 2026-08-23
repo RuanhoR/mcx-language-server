@@ -53,23 +53,18 @@ export function createMCXLanguageClient(context: ExtensionContext): LanguageClie
   if (tsModule) {
     childEnv.MCX_TYPESCRIPT_PATH = tsModule;
   }
-  const preloadPatch = Uri.joinPath(
-    context.extensionUri,
-    "patch-ts.cjs"
-  ).fsPath;
-  const runExecArgv = ["--require", preloadPatch];
 
   const serverOptions: ServerOptions = {
     run: {
       module: serverModule,
       transport: TransportKind.ipc,
-      options: { env: childEnv, execArgv: runExecArgv },
+      options: { env: childEnv },
     },
     debug: {
       module: serverModule,
       transport: TransportKind.ipc,
       options: {
-        execArgv: ["--require", preloadPatch, "--nolazy", "--inspect=6010"],
+        execArgv: ["--nolazy", "--inspect=6010"],
         env: childEnv,
       },
     },

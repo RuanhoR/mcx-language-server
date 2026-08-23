@@ -18,6 +18,47 @@ function createPluginPack() {
   }
 }
 
+/**
+ * Ship a tiny `typescript` stub instead of the real 20MB+ package.
+ * At runtime it forwards to the TypeScript bundled with VS Code itself:
+ * - server child process: MCX_TYPESCRIPT_PATH (set by the client)
+ * - extension host: derived from process.execPath (<app>/resources/app)
+ */
+function writeTypescriptStub() {
+  return {
+    name: "write-typescript-stub",
+    closeBundle() {
+      const dir = path.join("dist", "node_modules", "typescript")
+      fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(
+        path.join(dir, "package.json"),
+        JSON.stringify({ name: "typescript", version: "0.0.0-vscode-stub", main: "index.js" }, null, 2)
+      )
+      fs.writeFileSync(
+        path.join(dir, "index.js"),
+        [
+          "const fs = require('node:fs')",
+          "const path = require('node:path')",
+          "function resolveTarget() {",
+          "  const envPath = process.env.MCX_TYPESCRIPT_PATH",
+          "  if (envPath && fs.existsSync(envPath)) return envPath",
+          "  const exeDir = path.dirname(process.execPath)",
+          "  const candidates = [",
+          "    path.join(exeDir, 'resources', 'app', 'extensions', 'node_modules', 'typescript', 'lib', 'typescript.js'),",
+          "    path.join(exeDir, 'extensions', 'node_modules', 'typescript', 'lib', 'typescript.js'),",
+          "    path.join(exeDir, 'node_modules', 'typescript', 'lib', 'typescript.js')",
+          "  ]",
+          "  for (const c of candidates) if (fs.existsSync(c)) return c",
+          "  throw new Error('[mcx] cannot locate the TypeScript module shipped with VS Code')",
+          "}",
+          "module.exports = require(resolveTarget())",
+          ""
+        ].join("\n")
+      )
+    }
+  }
+}
+
 function inlineBabelRequires() {
   return {
     name: "inline-babel-requires",
@@ -66,5 +107,5 @@ export default defineConfig({
     async buildStart() {
       await rm('./dist', { recursive: true, force: true })
     }
-  }, inlineBabelRequires(), createPluginPack()],
+  }, inlineBabelRequires(), createPluginPack(), writeTypescriptStub()],
 })

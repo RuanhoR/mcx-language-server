@@ -3,3 +3,4 @@ tsconfig.json
 rolldown.config.mjs
 changelog
 *.tgz
+!dist/node_modules/**
