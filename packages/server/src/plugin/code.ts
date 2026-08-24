@@ -475,19 +475,24 @@ export class MCXVirtualCode implements VirtualCode {
     runtimeType: MCXRuntimeType,
     hasEventImports: boolean = false,
   ): string {
+    const mcxTypes = 'import("@mbler/mcx-types")'
     if (runtimeType === 'app') {
       if (hasEventImports) {
-        return 'Omit<import("@mbler/mcx-types").MCXFile<"app">, "app">'
+        return `Omit<${mcxTypes}.MCXFile<"app">, "app">`
       }
-      return 'import("@mbler/mcx-types").MCXFile<"app">'
+      return `${mcxTypes}.MCXFile<"app">`
     }
     if (runtimeType === 'event') {
-      return 'InstanceType<typeof import("@mbler/mcx").Event>'
+      // In app context the buildEventImportsSection overrides this to Event;
+      // standalone event files keep the generic MCXFile wrapper.
+      return `${mcxTypes}.MCXFile<"event">`
     }
     if (runtimeType === 'ui') {
-      return 'import("@mbler/mcx-types").MCXFile<"ui">'
+      return `${mcxTypes}.MCXFile<"ui">`
     }
-    return 'import("@mbler/mcx-types").MCXFile<"component">'
+    // component: named exports pass through from script source,
+    // default export is a lightweight marker (like Vue SFC).
+    return `{ type: 'component' }`
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
