@@ -20,7 +20,7 @@
 - "Cannot find name 'Record' / 'Object'" — lib files now resolve through VS Code's own TypeScript
 - Extension activation failure caused by an eager `require('typescript')` in the vendor chunk
 
-## [1.1.0] - Unreleased
+## [1.1.0] - 2026-07-15
 
 ### Fixes
 
