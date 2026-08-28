@@ -25,7 +25,7 @@ import {
 import * as path from 'node:path'
 import type * as mcx from '@mbler/mcx-core'
 import type { LanguageClient } from 'vscode-languageclient/node.js'
-import { createMCXLanguageClient } from './client/index.js'
+import { createMCXLanguageClient, registerUnsavedContentSync } from './client/index.js'
 import { formatMCXDocument } from './format/index.js'
 
 type MCXPosition = mcx.PubType.MCXPosition
@@ -96,7 +96,9 @@ async function getCachedAST(source: string): Promise<{ tags: MCXTagNode[]; compi
 
 export function activate(context: ExtensionContext): void {
   client = createMCXLanguageClient(context);
-  client.start().catch((e: Error) => {
+  client.start().then(() => {
+    registerUnsavedContentSync(client!, context.subscriptions);
+  }).catch((e: Error) => {
     window.showErrorMessage(`MCX language server failed to start: ${e.message}`);
   });
 
@@ -231,6 +233,7 @@ async function restartLanguageServer(context: ExtensionContext): Promise<void> {
   client = createMCXLanguageClient(context)
   try {
     await client.start()
+    registerUnsavedContentSync(client, context.subscriptions)
     window.showInformationMessage('MCX language server restarted successfully.')
   } catch (e) {
     window.showErrorMessage(`MCX language server restart failed: ${(e as Error).message}`)
