@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4] - 2026-08-28
+
+### Fixes
+
+- Auto-import completions now add the `import` statement in `.mcx` files without import declarations (previously the edit was silently dropped when the `<Event>` block's `McxExtendsBy` injected an import into the generated code)
+- Imports inserted by completion now land on their own line after `<script lang="ts">` instead of being appended to the tag line
+
 ## [1.1.3] - 2026-08-23
 
 ### Features

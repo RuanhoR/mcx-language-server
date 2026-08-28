@@ -380,6 +380,58 @@ describe('MCXVirtualCode', () => {
     expect(text).toContain('afterEvents')
   })
 
+  it('should not emit real import statements for McxExtendsBy extends', async () => {
+    const { MCXVirtualCode } = await import('../src/plugin/code')
+    mockState._parseData.compileResult = {
+      raw: [],
+      JSIR: { BuildCache: { call: [], import: [], export: [] } },
+      strLoc: {
+        script: '',
+        Event: {
+          on: 'after',
+          subscribe: { playerJoin: 'onPlayerJoin', McxExtendsBy: './EventBefore.mcx' },
+          loc: { line: 1, column: 0 },
+          isLoad: true,
+        },
+        Component: {},
+        UI: null,
+        Form: null,
+      },
+      File: '', isFile: false, setFilePath: () => {},
+    }
+    mockState._parseData.parseASTResult = [
+      createScriptTag('const x = 1', { lang: 'ts' }),
+      createEventTag('playerJoin = onPlayerJoin\n  McxExtendsBy = ./EventBefore.mcx'),
+    ]
+    const snapshot = makeSnapshot('<script lang="ts">const x = 1</script>\n<Event>playerJoin = onPlayerJoin\n  McxExtendsBy = ./EventBefore.mcx</Event>')
+    const code = new MCXVirtualCode(snapshot)
+    const scriptCode = code.embeddedCodes.find(e => e.id === 'script')
+    expect(scriptCode).toBeDefined()
+    const text = scriptCode!.snapshot.getText(0, scriptCode!.snapshot.getLength())
+    // A real injected `import` would pull the auto-import fixer's insert
+    // position into the generated (unmapped) tail, where edits get dropped.
+    expect(text).not.toMatch(/^import\s/m)
+    expect(text).toContain('declare const __mcx_ext_0: import("./EventBefore.mcx").default;')
+    expect(text).toContain('void __mcx_ext_0;')
+  })
+
+  it('should map generated offset 0 to the first script content line', async () => {
+    const { MCXVirtualCode } = await import('../src/plugin/code')
+    const source = '<script lang="ts">\nconst x = 1\n</script>'
+    mockState._parseData.parseASTResult = [createScriptTag('\nconst x = 1\n', { lang: 'ts' })]
+    const code = new MCXVirtualCode(makeSnapshot(source))
+    const scriptCode = code.embeddedCodes.find(e => e.id === 'script')
+    expect(scriptCode).toBeDefined()
+    const mapping = scriptCode!.mappings[0]!
+    const generated = scriptCode!.snapshot.getText(0, scriptCode!.snapshot.getLength())
+    // generated[0] must be real script text (not the leading newline), and it
+    // must map back to the same text in the source file
+    expect(generated[0]).toBe('c')
+    const sourceOffset = mapping.sourceOffsets[0]
+    expect(source.slice(sourceOffset, sourceOffset + 11)).toBe('const x = 1')
+    expect(source.slice(sourceOffset, sourceOffset + 11)).toBe(generated.slice(0, 11))
+  })
+
   it('should update with new snapshot', async () => {
     const { MCXVirtualCode } = await import('../src/plugin/code')
     mockState._parseData.parseASTResult = []

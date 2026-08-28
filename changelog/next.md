@@ -48,3 +48,7 @@
 ### 2026-07-11
 
 - **fix**: Activate on `.mcx` open; fixed script block features (`03247fa`)
+
+### 2026-08-28
+
+- **fix(server)**: Auto-import code actions now add the import statement in `.mcx` files without import declarations — the `McxExtendsBy` validation section no longer injects a real `import` into the generated virtual code (it would pull the auto-import insert position into the unmapped generated tail, where Volar silently dropped the edit); it now uses a type-level `declare const` reference, and the script content mapping skips the leading newline so imports insert on their own line

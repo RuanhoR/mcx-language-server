@@ -193,6 +193,14 @@ export class MCXVirtualCode implements VirtualCode {
     }
 
     const scriptSource = source.slice(range.start, range.end)
+    // Skip the newline right after the opening tag so generated offset 0 is
+    // real script text: auto-import edits inserted at the top of the virtual
+    // file then map to the first script line instead of the `<script>` line.
+    const leadingWsMatch = scriptSource.match(/^[ \t]*\r?\n/)
+    const scriptContentOffset = range.start + (leadingWsMatch?.[0].length ?? 0)
+    const scriptContent = leadingWsMatch
+      ? scriptSource.slice(leadingWsMatch[0].length)
+      : scriptSource
     const scriptLang = (scriptTag.arr?.lang ?? '').toString().toLowerCase()
     const isTypeScript = scriptLang === 'ts' || scriptLang === 'typescript'
 
@@ -214,14 +222,14 @@ export class MCXVirtualCode implements VirtualCode {
       compileData,
     )
     const generated =
-      scriptSource + metadataSection + validationSection + runtimeSection
+      scriptContent + metadataSection + validationSection + runtimeSection
 
     const mappings: CodeMapping[] = []
-    if (scriptSource.length > 0) {
+    if (scriptContent.length > 0) {
       mappings.push({
-        sourceOffsets: [range.start],
+        sourceOffsets: [scriptContentOffset],
         generatedOffsets: [0],
-        lengths: [scriptSource.length],
+        lengths: [scriptContent.length],
         data: FULL_FEATURES,
       })
     }
@@ -427,8 +435,12 @@ export class MCXVirtualCode implements VirtualCode {
       if (key === 'McxExtendsBy') {
         for (const extFile of value.split(',').map(s => s.trim())) {
           if (!extFile) continue
+          // Type-level reference instead of a real `import` statement: an
+          // injected import in the generated (unmapped) tail would make the
+          // auto-import fixer place user imports after it, where the edit
+          // can't be mapped back to the .mcx source and gets dropped.
           chunks.push(
-            `import __mcx_ext_${extendsIndex} from ${JSON.stringify(extFile)};`,
+            `declare const __mcx_ext_${extendsIndex}: import(${JSON.stringify(extFile)}).default;`,
           )
           chunks.push(`void __mcx_ext_${extendsIndex};`)
           extendsIndex++
