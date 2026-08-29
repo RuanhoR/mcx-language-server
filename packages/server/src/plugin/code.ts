@@ -265,12 +265,16 @@ export class MCXVirtualCode implements VirtualCode {
   /**
    * Build the embedded script text for the TypeScript service.
    *
-   * In an app file the build replaces every default/namespace import of an
-   * `.mcx` event file with an injected `Event` instance, so the virtual code
-   * shadows those import bindings with `declare const <name>: Event` (the
-   * original import statements are excluded from the mappings). Without this,
-   * the imported binding keeps the generic `MCXFile<"event">` type of the
-   * imported module and calls like `event.subscribe()` are type errors.
+   * In an app file the build shadows every default/namespace import of an
+   * `.mcx` event file with `declare const <name>: Event` so calls like
+   * `event.subscribe()` type-check (the imported binding would otherwise keep
+   * the generic `MCXFile<"event">` type of the imported module).
+   *
+   * The import statement itself stays in the generated code but with a
+   * renamed internal binding: the module path must remain a real import so
+   * hovering the source statement still shows the `import ...` /
+   * `module "..."` documentation and go-to-definition opens the event file.
+   * Only the internal binding name lies outside the mappings.
    */
   private buildScriptContent(
     scriptContent: string,
@@ -317,7 +321,7 @@ export class MCXVirtualCode implements VirtualCode {
     const mappings: CodeMapping[] = []
     let srcPos = 0
     let genPos = 0
-    let replaced = 0
+    let shadowed = 0
 
     const pushMappedSegment = (length: number): void => {
       if (length <= 0) return
@@ -332,23 +336,47 @@ export class MCXVirtualCode implements VirtualCode {
       genPos += length
     }
 
-    for (const match of scriptContent.matchAll(importRe)) {
-      const bindingName = match[1] ?? match[2]
-      const replacement = bindingName ? injectedTypes.get(bindingName) : undefined
-      if (!replacement) continue
-
-      const start = match.index
-      const end = start + match[0].length
-      pushMappedSegment(start - srcPos)
-      // The injected declaration does not exist in the source file, so it
-      // stays outside the mappings (like the generated sections).
-      scriptText += `declare const ${bindingName}: ${replacement};`
-      genPos += scriptText.length - genPos
-      srcPos = end
-      replaced++
+    const pushUnmapped = (text: string): void => {
+      scriptText += text
+      genPos += text.length
     }
 
-    if (replaced === 0) {
+    for (const match of scriptContent.matchAll(importRe)) {
+      const bindingName = match[1] ?? match[2]
+      const replacement = injectedTypes.get(bindingName)
+      if (!replacement) continue
+
+      const stmt = match[0]
+      const start = match.index
+      // The binding is the last token before ` from `; match its prefix
+      // (`import ` / `import * as `) so the generated import keeps the exact
+      // same leading text and stays mapped 1:1.
+      const bindMatch = /^(?:import\s+)(?:\*\s*as\s+)?([\w$]+)/.exec(stmt)
+      const bindRel = bindMatch ? bindMatch[0].length - bindMatch[1]!.length : 7
+
+      // 1) prefix — identical text in source and generated import
+      pushMappedSegment(start + bindRel - srcPos)
+      // 2) renamed internal binding — keeps the module import alive for
+      //    hover/navigation but must not surface its name; skip the source
+      //    binding without mapping it
+      pushUnmapped(`__mcx_import_${shadowed}`)
+      srcPos = start + bindRel + bindingName.length
+      // 3) ` from "<path>";` tail — identical text again
+      pushMappedSegment(start + stmt.length - srcPos)
+      // 4) shadowing declaration (unmapped, like the generated sections);
+      //    only its binding name token maps back to the source binding
+      const declBindingGen = genPos + 1 + 'declare const '.length
+      pushUnmapped(`\ndeclare const ${bindingName}: ${replacement};`)
+      mappings.push({
+        sourceOffsets: [scriptContentOffset + start + bindRel],
+        generatedOffsets: [declBindingGen],
+        lengths: [bindingName.length],
+        data: FULL_FEATURES,
+      })
+      shadowed++
+    }
+
+    if (shadowed === 0) {
       return { scriptText: scriptContent, mappings: defaultMappings }
     }
 

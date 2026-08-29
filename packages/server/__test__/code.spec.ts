@@ -465,13 +465,27 @@ describe('MCXVirtualCode', () => {
     expect(scriptCode).toBeDefined()
     const text = scriptCode!.snapshot.getText(0, scriptCode!.snapshot.getLength())
     // The build injects Event instances in app context: the import binding is
-    // shadowed with an Event type instead of the imported MCXFile<"event">
+    // shadowed with an Event type instead of the imported MCXFile<"event">,
+    // while the import statement itself stays (renamed) so hovering it still
+    // resolves to the event module
     expect(text).toContain('declare const event: import("@mbler/mcx-types").Event;')
+    expect(text).toContain('import __mcx_import_0 from "./Event.mcx";')
     expect(text).not.toContain('import event from')
-    // the injected declaration is unmapped; `event.subscribe()` stays mapped
+    // the renamed binding and the injected declaration are unmapped generated
+    // text; every source char stays mapped (the binding via its own mapping)
     const mappedLength = scriptCode!.mappings.reduce((sum, m) => sum + m.lengths[0]!, 0)
-    expect(mappedLength).toBeLessThan(scriptText.length)
+    expect(mappedLength).toBeGreaterThanOrEqual(scriptText.length)
     expect(scriptCode!.mappings.length).toBeGreaterThan(0)
+    // the source binding maps onto the injected declaration's name token
+    const bindMapping = scriptCode!.mappings.find(
+      m => m.lengths[0] === 'event'.length && m.generatedOffsets[0]! > 0,
+    )
+    expect(bindMapping).toBeDefined()
+    const genText = scriptCode!.snapshot.getText(
+      bindMapping!.generatedOffsets[0]!,
+      bindMapping!.generatedOffsets[0]! + bindMapping!.lengths[0]!,
+    )
+    expect(genText).toBe('event')
   })
 
   it('should keep event imports as MCXFile outside app context', async () => {

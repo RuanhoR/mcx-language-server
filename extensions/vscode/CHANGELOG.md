@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.5] - 2026-08-29
+
+### Fixes
+
+- Hovering an event `.mcx` import in an app file (e.g. `import event from "./Event.mcx"`) shows the import declaration and module path again, and go-to-definition opens the event file — the import statement is kept in the generated code (with a renamed internal binding) while the binding is still typed as the injected `Event`
+
 ## [1.1.4] - 2026-08-28
 
 ### Fixes
