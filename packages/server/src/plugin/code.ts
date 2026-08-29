@@ -526,8 +526,11 @@ export class MCXVirtualCode implements VirtualCode {
       })
 
       lines.push(...varDeclarations)
+      // `as unknown as` bridges the two contracts: the runtime value is an
+      // Event[] (from MCXCtx.event), while `MCXFile<"app">["app"]["event"]`
+      // expects MCXFile<"event">[] — the intersection satisfies both
       lines.push(
-        `const __MCX_app_data = { event: [${eventValues.join(', ')}] };`,
+        `const __MCX_app_data = { event: [${eventValues.join(', ')}] } as unknown as { event: (import("@mbler/mcx-types").Event & import("@mbler/mcx-types").MCXFile<"event">)[] };`,
       )
     }
 
