@@ -221,18 +221,14 @@ export class MCXVirtualCode implements VirtualCode {
       isTypeScript,
       compileData,
     )
+    const { scriptText, mappings } = this.buildScriptContent(
+      scriptContent,
+      scriptContentOffset,
+      isTypeScript,
+      compileData,
+    )
     const generated =
-      scriptContent + metadataSection + validationSection + runtimeSection
-
-    const mappings: CodeMapping[] = []
-    if (scriptContent.length > 0) {
-      mappings.push({
-        sourceOffsets: [scriptContentOffset],
-        generatedOffsets: [0],
-        lengths: [scriptContent.length],
-        data: FULL_FEATURES,
-      })
-    }
+      scriptText + metadataSection + validationSection + runtimeSection
 
     return new EmbeddedCode(
       'script',
@@ -264,6 +260,100 @@ export class MCXVirtualCode implements VirtualCode {
         data: DISABLED_FEATURES,
       },
     ])
+  }
+
+  /**
+   * Build the embedded script text for the TypeScript service.
+   *
+   * In an app file the build replaces every default/namespace import of an
+   * `.mcx` event file with an injected `Event` instance, so the virtual code
+   * shadows those import bindings with `declare const <name>: Event` (the
+   * original import statements are excluded from the mappings). Without this,
+   * the imported binding keeps the generic `MCXFile<"event">` type of the
+   * imported module and calls like `event.subscribe()` are type errors.
+   */
+  private buildScriptContent(
+    scriptContent: string,
+    scriptContentOffset: number,
+    isTypeScript: boolean,
+    compileData?: InstanceType<typeof mcx.compiler.MCXCompileData>,
+  ): { scriptText: string; mappings: CodeMapping[] } {
+    const defaultMappings: CodeMapping[] = []
+    if (scriptContent.length > 0) {
+      defaultMappings.push({
+        sourceOffsets: [scriptContentOffset],
+        generatedOffsets: [0],
+        lengths: [scriptContent.length],
+        data: FULL_FEATURES,
+      })
+    }
+
+    if (
+      !compileData ||
+      !isTypeScript ||
+      this.resolveRuntimeType(compileData) !== 'app'
+    ) {
+      return { scriptText: scriptContent, mappings: defaultMappings }
+    }
+
+    const eventImports = this.extractEventImports(compileData)
+    if (eventImports.length === 0) {
+      return { scriptText: scriptContent, mappings: defaultMappings }
+    }
+
+    const injectedTypes = new Map(
+      eventImports.map(imp => [
+        imp.as,
+        imp.type === 'all'
+          ? `{ default: import("@mbler/mcx-types").Event }`
+          : `import("@mbler/mcx-types").Event`,
+      ]),
+    )
+
+    const importRe =
+      /\bimport\s+(?:([\w$]+)\s*from|\*\s*as\s+([\w$]+)\s*from)\s*(["'])([^"']+\.mcx)\3;?/g
+
+    let scriptText = ''
+    const mappings: CodeMapping[] = []
+    let srcPos = 0
+    let genPos = 0
+    let replaced = 0
+
+    const pushMappedSegment = (length: number): void => {
+      if (length <= 0) return
+      mappings.push({
+        sourceOffsets: [scriptContentOffset + srcPos],
+        generatedOffsets: [genPos],
+        lengths: [length],
+        data: FULL_FEATURES,
+      })
+      scriptText += scriptContent.slice(srcPos, srcPos + length)
+      srcPos += length
+      genPos += length
+    }
+
+    for (const match of scriptContent.matchAll(importRe)) {
+      const bindingName = match[1] ?? match[2]
+      const replacement = bindingName ? injectedTypes.get(bindingName) : undefined
+      if (!replacement) continue
+
+      const start = match.index
+      const end = start + match[0].length
+      pushMappedSegment(start - srcPos)
+      // The injected declaration does not exist in the source file, so it
+      // stays outside the mappings (like the generated sections).
+      scriptText += `declare const ${bindingName}: ${replacement};`
+      genPos += scriptText.length - genPos
+      srcPos = end
+      replaced++
+    }
+
+    if (replaced === 0) {
+      return { scriptText: scriptContent, mappings: defaultMappings }
+    }
+
+    pushMappedSegment(scriptContent.length - srcPos)
+    return { scriptText, mappings }
   }
 
   private buildRuntimeModelSection(
@@ -304,7 +394,7 @@ export class MCXVirtualCode implements VirtualCode {
 
         const runtimeApp =
           runtimeType === 'app' && eventImports.length >= 1
-            ? '__MCX_app_data'
+            ? 'typeof __MCX_app_data'
             : '{}'
         lines.push(
           `const __MCX_runtime_default_export = null as unknown as __MCX_runtime_export & { app: ${runtimeApp} };`,

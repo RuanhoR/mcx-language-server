@@ -51,5 +51,6 @@
 
 ### 2026-08-28
 
+- **fix(server)**: App-context `.mcx` event imports are now typed as the injected `Event` (shadowing the import binding in the virtual code); fixed the default-export type using a value (`__MCX_app_data`) as a type
 - **fix(server)**: Forward unsaved ts/js/json editor contents to the server (`mcx/fileContent`) and clear the TS auto-import caches on dependency changes, so new exports/deps appear in `.mcx` completions without saving (`bb2e7bf`)
 - **fix(server)**: Auto-import code actions now add the import statement in `.mcx` files without import declarations — the `McxExtendsBy` validation section no longer injects a real `import` into the generated virtual code (it would pull the auto-import insert position into the unmapped generated tail, where Volar silently dropped the edit); it now uses a type-level `declare const` reference, and the script content mapping skips the leading newline so imports insert on their own line

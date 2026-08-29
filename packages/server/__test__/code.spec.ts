@@ -432,6 +432,85 @@ describe('MCXVirtualCode', () => {
     expect(source.slice(sourceOffset, sourceOffset + 11)).toBe(generated.slice(0, 11))
   })
 
+  it('should inject Event types for .mcx event imports in app context', async () => {
+    const { MCXVirtualCode } = await import('../src/plugin/code')
+    const scriptText = 'import event from "./Event.mcx";\nevent.subscribe();'
+    mockState._parseData.compileResult = {
+      raw: [],
+      JSIR: {
+        BuildCache: {
+          call: [],
+          import: [
+            {
+              source: './Event.mcx',
+              imported: [{ as: 'event', import: 'default', isAll: false }],
+            },
+          ],
+          export: [],
+        },
+      },
+      strLoc: {
+        script: '',
+        Event: { on: 'after', subscribe: {}, loc: { line: 1, column: 0 }, isLoad: false },
+        Component: {},
+        UI: null,
+        Form: null,
+      },
+      File: '', isFile: false, setFilePath: () => {},
+    }
+    mockState._parseData.parseASTResult = [createScriptTag(scriptText, { lang: 'ts' })]
+    const snapshot = makeSnapshot(`<script lang="ts">${scriptText}</script>`)
+    const code = new MCXVirtualCode(snapshot)
+    const scriptCode = code.embeddedCodes.find(e => e.id === 'script')
+    expect(scriptCode).toBeDefined()
+    const text = scriptCode!.snapshot.getText(0, scriptCode!.snapshot.getLength())
+    // The build injects Event instances in app context: the import binding is
+    // shadowed with an Event type instead of the imported MCXFile<"event">
+    expect(text).toContain('declare const event: import("@mbler/mcx-types").Event;')
+    expect(text).not.toContain('import event from')
+    // the injected declaration is unmapped; `event.subscribe()` stays mapped
+    const mappedLength = scriptCode!.mappings.reduce((sum, m) => sum + m.lengths[0]!, 0)
+    expect(mappedLength).toBeLessThan(scriptText.length)
+    expect(scriptCode!.mappings.length).toBeGreaterThan(0)
+  })
+
+  it('should keep event imports as MCXFile outside app context', async () => {
+    const { MCXVirtualCode } = await import('../src/plugin/code')
+    const scriptText = 'import event from "./Event.mcx";\nevent.subscribe();'
+    mockState._parseData.compileResult = {
+      raw: [],
+      JSIR: {
+        BuildCache: {
+          call: [],
+          import: [
+            {
+              source: './Event.mcx',
+              imported: [{ as: 'event', import: 'default', isAll: false }],
+            },
+          ],
+          export: [],
+        },
+      },
+      strLoc: {
+        script: '',
+        Event: { on: 'after', subscribe: { playerJoin: 'h' }, loc: { line: 1, column: 0 }, isLoad: true },
+        Component: {},
+        UI: null,
+        Form: null,
+      },
+      File: '', isFile: false, setFilePath: () => {},
+    }
+    mockState._parseData.parseASTResult = [createScriptTag(scriptText, { lang: 'ts' })]
+    const snapshot = makeSnapshot(`<script lang="ts">${scriptText}</script>`)
+    const code = new MCXVirtualCode(snapshot)
+    const scriptCode = code.embeddedCodes.find(e => e.id === 'script')
+    expect(scriptCode).toBeDefined()
+    const text = scriptCode!.snapshot.getText(0, scriptCode!.snapshot.getLength())
+    // event-type files keep the plain import (runtime type is "event", no injection)
+    expect(text).toContain('import event from "./Event.mcx"')
+    expect(text).not.toContain('declare const event:')
+  })
+
   it('should update with new snapshot', async () => {
     const { MCXVirtualCode } = await import('../src/plugin/code')
     mockState._parseData.parseASTResult = []
