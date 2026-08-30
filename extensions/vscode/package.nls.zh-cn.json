@@ -1,3 +1,4 @@
 {
-  "mcx.restart.language": "重启语言服务器"
+  "mcx.restart.language": "重启语言服务器",
+  "mcx.action.welcome": "欢迎"
 }

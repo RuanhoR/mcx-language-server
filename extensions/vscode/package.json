@@ -1,6 +1,6 @@
 {
   "name": "mcx-vscode-client",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "Language support for MCX language.",
   "publisher": "ruanhor",
   "license": "MIT",
@@ -16,7 +16,8 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onLanguage"
+    "onLanguage",
+    "onStartupFinished"
   ],
   "repository": {
     "url": "https://github.com/RuanhoR/mcx-language-server"
@@ -36,6 +37,11 @@
       {
         "command": "mcx.restart.language",
         "title": "%mcx.restart.language%",
+        "category": "MCX"
+      },
+      {
+        "command": "mcx.action.welcome",
+        "title": "%mcx.action.welcome%",
         "category": "MCX"
       }
     ],
@@ -68,7 +74,17 @@
         "name": "mcx-typescript-plugin-pack",
         "enableForWorkspaceTypeScriptVersions": true
       }
-    ]
+    ],
+    "configuration": {
+      "title": "MCX",
+      "properties": {
+        "mcx.welcome.show": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the welcome page when the extension is installed or updated."
+        }
+      }
+    }
   },
   "devDependencies": {
     "@mbler/mcx-core": "1.1.5-dev.1",

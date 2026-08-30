@@ -27,6 +27,7 @@ import type * as mcx from '@mbler/mcx-core'
 import type { LanguageClient } from 'vscode-languageclient/node.js'
 import { createMCXLanguageClient, registerUnsavedContentSync } from './client/index.js'
 import { formatMCXDocument } from './format/index.js'
+import { registerWelcome } from './welcome.js'
 
 type MCXPosition = mcx.PubType.MCXPosition
 type MCXTagNode = mcx.PubType.ParsedTagNode
@@ -94,7 +95,19 @@ async function getCachedAST(source: string): Promise<{ tags: MCXTagNode[]; compi
   return result
 }
 
-export function activate(context: ExtensionContext): void {
+let clientStarted = false
+
+/**
+ * Start the language client once. With `onStartupFinished` activation the
+ * extension wakes up on every VS Code launch, so skip the server when the
+ * workspace has no `.mcx` content — it starts lazily on the first mcx file.
+ */
+async function ensureClientStarted(context: ExtensionContext): Promise<void> {
+  if (clientStarted) {
+    return
+  }
+  clientStarted = true
+
   client = createMCXLanguageClient(context);
   client.start().then(() => {
     registerUnsavedContentSync(client!, context.subscriptions);
@@ -108,6 +121,28 @@ export function activate(context: ExtensionContext): void {
   context.subscriptions.push({
     dispose: () => clearTimeout(tsserverRestartTimer),
   })
+}
+
+export function activate(context: ExtensionContext): void {
+  const hasOpenMcx = workspace.textDocuments.some(
+    doc => doc.languageId === 'mcx' || doc.uri.fsPath.endsWith('.mcx'),
+  )
+  const startNow = hasOpenMcx
+    ? Promise.resolve(true)
+    : workspace.findFiles('**/*.mcx', '**/node_modules/**', 1).then(files => files.length > 0)
+  void startNow.then(started => {
+    if (started) {
+      return ensureClientStarted(context)
+    }
+  })
+
+  const openDisposable = workspace.onDidOpenTextDocument(doc => {
+    void ensureMCXLanguage(doc)
+    if (doc.languageId === 'mcx' || doc.uri.fsPath.endsWith('.mcx')) {
+      void ensureClientStarted(context)
+    }
+  })
+  context.subscriptions.push(openDisposable)
 
   const formattingProvider: DocumentFormattingEditProvider = {
     provideDocumentFormattingEdits(document, options) {
@@ -166,13 +201,11 @@ export function activate(context: ExtensionContext): void {
     ),
   )
 
-  const openDisposable = workspace.onDidOpenTextDocument(doc => {
-    void ensureMCXLanguage(doc)
-  })
-  context.subscriptions.push(openDisposable)
-
   for (const doc of workspace.textDocuments) {
     void ensureMCXLanguage(doc)
+    if (doc.languageId === 'mcx' || doc.uri.fsPath.endsWith('.mcx')) {
+      void ensureClientStarted(context)
+    }
   }
 
   const restartCommand = commands.registerCommand(
@@ -182,6 +215,8 @@ export function activate(context: ExtensionContext): void {
     },
   )
   context.subscriptions.push(restartCommand)
+
+  registerWelcome(context)
 
   context.subscriptions.push({
     dispose: () => {
@@ -210,6 +245,7 @@ export async function deactivate(): Promise<void> {
 
   await client.stop()
   client = undefined
+  clientStarted = false
 }
 
 function patchTypeScriptExtension(): void {
@@ -229,6 +265,7 @@ async function restartLanguageServer(context: ExtensionContext): Promise<void> {
     await client.stop()
     client = undefined
   }
+  clientStarted = true
 
   client = createMCXLanguageClient(context)
   try {

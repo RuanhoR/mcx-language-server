@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.6] - 2026-08-30
+
+### Features
+
+- Welcome page (`MCX: Welcome` command); shows automatically after install/update (toggle via `mcx.welcome.show`)
+- Extension now activates on startup (lazy language server start — the server only runs when `.mcx` files are present)
+
+### Fixes
+
+- `<` and `>` inside `<script>` blocks no longer get rainbow-bracket colors (the `<` `>` pair was declared as a language bracket pair; also removed the `<` auto-closing pair so typing `<` in TypeScript no longer inserts `>`)
+
 ## [1.1.5] - 2026-08-29
 
 ### Fixes

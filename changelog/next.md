@@ -1,4 +1,12 @@
-# Unreleased (since 2026-05-31)
+# Unreleased
+
+### 2026-08-30
+
+- **feat(vscode)**: Welcome page (`MCX: Welcome`), auto-shown on install/update; startup activation with lazy language server start (`mcx.welcome.show` to disable)
+- **fix(vscode)**: Removed `<`/`>` from the language bracket pairs and auto-closing pairs — rainbow bracket colorization painted comparison operators red inside `<script>` blocks; typing `<` no longer auto-inserts `>`
+- **chore(vscode)**: Bump to 1.1.6
+
+ (since 2026-05-31)
 
 ### 2026-06-08
 
