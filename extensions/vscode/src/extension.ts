@@ -395,6 +395,17 @@ async function provideMCXCompletions(
     .text.slice(0, position.character)
   const fullLine = document.lineAt(position.line).text
 
+  // Script content must be checked FIRST: typing `<` inside TypeScript (for
+  // example `Array<C`) would otherwise be treated as an MCX tag and offer
+  // top-level tag completions like `Component`.
+  const scriptBlock = await getScriptBlock(document.getText())
+  if (
+    scriptBlock &&
+    isInsideScriptBlockContent(document, position, scriptBlock)
+  ) {
+    return provideScriptCompletions(document, position, fullLine, linePrefix)
+  }
+
   if (/<\/[A-Za-z:_-]*$/.test(linePrefix)) {
     const openTags = getOpenTagStack(document.getText())
     if (openTags.length === 0) return []
@@ -432,14 +443,6 @@ async function provideMCXCompletions(
       item.detail = 'script lang'
       return item
     })
-  }
-
-  const scriptBlock = await getScriptBlock(document.getText())
-  if (
-    scriptBlock &&
-    isInsideScriptBlockContent(document, position, scriptBlock)
-  ) {
-    return provideScriptCompletions(document, position, fullLine, linePrefix)
   }
 
   const tagName = currentTagName(linePrefix)

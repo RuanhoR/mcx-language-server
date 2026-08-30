@@ -9,6 +9,7 @@
 
 ### Fixes
 
+- Typing `<` inside `<script>` no longer offers top-level MCX tag completions (`Component`, `Ui`, ...) — the script-content check now runs before the tag-completion branch
 - `<` and `>` inside `<script>` blocks no longer get rainbow-bracket colors (the `<` `>` pair was declared as a language bracket pair; also removed the `<` auto-closing pair so typing `<` in TypeScript no longer inserts `>`)
 
 ## [1.1.5] - 2026-08-29
