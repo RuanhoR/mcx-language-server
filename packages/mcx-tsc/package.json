@@ -12,6 +12,7 @@
   },
   "scripts": {
     "lint": "eslint src --ext .js,.ts",
+    "type-check": "tsc --noEmit",
     "lint:fix": "eslint src --ext .js,.ts --fix",
     "build": "rolldown -c"
   },

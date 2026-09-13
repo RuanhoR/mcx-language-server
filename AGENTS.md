@@ -17,9 +17,9 @@ Root is a pnpm workspace (v11.8.0). No lint config exists. Formatter is Prettier
 
 | Path | Build | TypeCheck | Test | Pack |
 |---|---|---|---|---|
-| `packages/server` | `pnpm build` (rolldown) | `npx tsc --noEmit` | `pnpm test` (vitest) | — |
-| `packages/ts-plugin` | `pnpm build` (tsc) | `npx tsc --noEmit` | `pnpm test` (vitest) | — |
-| `packages/mcx-tsc` | `pnpm build` (rolldown) | `pnpm exec tsc --noEmit` | — (no tests) | — |
+| `packages/server` | `pnpm build` (rolldown) | `pnpm type-check` | `pnpm test` (vitest) | — |
+| `packages/ts-plugin` | `pnpm build` (tsc) | `pnpm type-check` | `pnpm test` (vitest) | — |
+| `packages/mcx-tsc` | `pnpm build` (rolldown) | `pnpm type-check` | — (no tests) | — |
 | `extensions/vscode` | `pnpm build` (rolldown) | `pnpm run type-check` | `pnpm test` | `pnpm run pack` (vsce) |
 
 Root scripts: `pnpm prepare` (installs git hooks, run once after clone).

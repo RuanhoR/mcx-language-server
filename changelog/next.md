@@ -67,3 +67,5 @@
 ### 2026-08-29
 
 - **fix(server)**: Restored hover documentation and go-to-definition on `.mcx` event imports in app files — the generated virtual code now keeps the import statement (with a renamed internal binding) so the source import still resolves to the event module; the `Event` typing from (`bdf60dd`) is unchanged and the source binding maps onto the injected `declare const` declaration
+- **fix(server)**: App-data event entries now satisfy both contracts (`e2dbe79`)
+- **chore**: Bumped `@mbler/mcx-core` to 1.1.5-dev.1, mcx-server and mcx-tsc to rc, VS Code extension to 1.1.5 (`5d0be7f`, `46a5bbf`, `89fae5d`, `59865d8`)
