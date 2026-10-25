@@ -1,34 +1,11 @@
-import type * as mcx from "@mbler/mcx-core";
-
-let mcxModulePromise: Promise<typeof mcx> | undefined
-function loadMcx(): Promise<typeof mcx> {
-  return (mcxModulePromise ??= import("@mbler/mcx-core"))
-}
 import {
   Position,
   Range,
   TextEdit,
   type FormattingOptions,
   type TextDocument,
-} from "vscode";
-
-interface MCXTagContentNode {
-  type: "TagContent";
-  data: string;
-}
-
-interface MCXCommentNode {
-  type: "Comment";
-  data: string;
-}
-
-interface MCXTagNode {
-  type: "TagNode";
-  name: string;
-  arr: Record<string, string | boolean>;
-  content: Array<MCXTagNode | MCXTagContentNode | MCXCommentNode>;
-  end: unknown | null;
-}
+} from 'vscode'
+import { loadMcx, type MCXCommentNode, type MCXTagContentNode, type MCXTagNode } from '../mcx-ast.js'
 
 /**
  * Format MCX text by rebuilding output from parsed AST nodes.
@@ -102,6 +79,18 @@ function printTagNode(node: MCXTagNode, indentUnit: string, depth: number): stri
     return `${indent}${openTag}\n${scriptBody}\n${indent}</${node.name}>`;
   }
 
+  // Event content is `eventName = handler` lines; normalize the spacing around
+  // `=` and keep blank-line grouping (it is how users separate event groups).
+  if (
+    node.name === "Event" &&
+    normalizedChildren.length === 1 &&
+    (normalizedChildren[0] as MCXTagContentNode).type === "TagContent"
+  ) {
+    const raw = (normalizedChildren[0] as MCXTagContentNode).data;
+    const body = indentMultiline(formatEventContent(raw), indentUnit.repeat(depth + 1));
+    return `${indent}${openTag}\n${body}\n${indent}</${node.name}>`;
+  }
+
   const lines: string[] = [`${indent}${openTag}`];
   for (const child of normalizedChildren) {
     lines.push(printNode(child, indentUnit, depth + 1));
@@ -164,6 +153,41 @@ function normalizeMultilineText(input: string): string {
   }, Infinity);
 
   return lines.map((line) => line.slice(minIndent)).join("\n");
+}
+
+/**
+ * Normalize `<Event>` content: one `key = handler` line each, `=` aligned to
+ * single spaces, at most one blank line between groups. Lines that are not
+ * `key = value` bindings are only trimmed.
+ */
+function formatEventContent(input: string): string {
+  const trimmedLines = input
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trim());
+
+  while (trimmedLines.length > 0 && trimmedLines[0] === "") {
+    trimmedLines.shift();
+  }
+  while (trimmedLines.length > 0 && trimmedLines[trimmedLines.length - 1] === "") {
+    trimmedLines.pop();
+  }
+
+  const lines: string[] = [];
+  let pendingBlanks = 0;
+  for (const line of trimmedLines) {
+    if (line === "") {
+      // collapse consecutive blank lines to one
+      pendingBlanks = Math.min(pendingBlanks + 1, 1);
+      continue;
+    }
+    if (pendingBlanks > 0 && lines.length > 0) {
+      lines.push("");
+    }
+    pendingBlanks = 0;
+    lines.push(line.includes("=") ? line.replace(/\s*=\s*/, " = ") : line);
+  }
+  return lines.join("\n");
 }
 
 function indentMultiline(text: string, indent: string): string {

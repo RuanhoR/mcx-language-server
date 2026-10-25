@@ -1,6 +1,6 @@
 {
   "name": "mcx-vscode-client",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Language support for MCX language.",
   "publisher": "ruanhor",
   "license": "MIT",
@@ -82,17 +82,29 @@
           "type": "boolean",
           "default": true,
           "description": "Show the welcome page when the extension is installed or updated."
+        },
+        "mcx.lint.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Lint .mcx files with the @mbler/eslint-plugin-mcx rules (duplicate root tags, unknown world events, invalid JSON prop values, missing <script lang>)."
+        },
+        "mcx.lint.allowUnknownEvents": {
+          "type": "boolean",
+          "default": false,
+          "description": "Accept any <Event> key instead of validating it against the @minecraft/server typings installed in the project. Turn this on if you bind events your typings do not declare."
         }
       }
     }
   },
   "devDependencies": {
-    "@mbler/mcx-core": "1.1.5-dev.1",
+    "@mbler/eslint-plugin-mcx": "0.0.1-rc.1",
+    "@mbler/mcx-core": "1.1.5-rc.4",
     "@mbler/mcx-server": "workspace:*",
     "@mbler/mcx-ts-plugin": "workspace:*",
     "@types/vscode": "^1.115.0",
     "@volar/vscode": "^2.4.28",
     "@vscode/vsce": "^3.9.1",
+    "eslint": "9.39.5",
     "typescript": "5.9.3",
     "vscode-languageclient": "^9.0.1"
   }

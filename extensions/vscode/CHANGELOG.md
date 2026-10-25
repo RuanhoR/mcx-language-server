@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+- `<Event>` block key completion: world event names for the configured side (`@after` / `@before`), extracted from the project's own `@minecraft/server` typings with the same brace-balanced parser as `@mbler/eslint-plugin-mcx` (bundled fallback lists when the package is absent), plus the `McxExtendsBy` directive; `.subscribe(` completions use the same per-project lists
+- `<Event>` content formatting: `key = handler` lines normalized to single spaces around `=`, blank-line grouping preserved
+- `.mcx` files are linted in the editor with `@mbler/eslint-plugin-mcx` — duplicate root tags, `<Event>` bindings against the project's `@minecraft/server` typings, non-JSON prop values and `<script>` without `lang`. Toggle with `mcx.lint.enable`, relax the event check with `mcx.lint.allowUnknownEvents`
+- Attribute completions now come from the compiler's own tables (`src/mcx-tags.ts`, mirrored from `@mbler/mcx-core`'s transforms), so a tag only offers the attributes it actually accepts, in the place where it is valid
+
+### Fixes
+
+- Accepting a tag completion right after typing `<` no longer leaves a stray `>` when VS Code auto-inserts the closing bracket (the completion range now consumes the auto-inserted `>`)
+- A trailing incomplete expression in `<script>` (e.g. `luckBlock.`) now surfaces `Identifier expected.` at the broken statement instead of silently merging with the generated code sections
+- Completing `@after` / `@before` no longer produces `@@after` — completions replace the partial attribute token (`@a`, `:ti`, `la`, `<close-b`) instead of being inserted after it
+- Tags inside `<Component>` no longer all offer `id`: the ten group tags (`items`, `blocks`, …) take no attributes, and their child tags offer the required `id` only
+- `<script>` no longer offers `@before` / `@after` / `id` (the compiler reads `lang` only), `<Event>` no longer offers `id`, and `<Form>` / `<Ui>` gained their real attributes (`setup`, `type`)
+- Missing component groups (`loot_tables`, `trade_tables`) and the `feature_rules` → `featureRule` mapping are no longer absent from tag completions
+- Hover attribute lists are generated from the same tables, so they no longer advertise attributes the compiler rejects (and now document `tick`, `for`, `if`, `value`)
+
+### Internal
+
+- `extension.ts` split into modules (`completion.ts`, `hover.ts`, `definition.ts`, `mcx-ast.ts`, `mcx-text.ts`, `mcx-events.ts`); the formatter reuses the shared AST helpers; bumped to 1.1.7; `@mbler/mcx-core` devDependency `1.1.5-dev.1` → `1.1.5-rc.4`
+
 ## [1.1.6] - 2026-08-30
 
 ### Features

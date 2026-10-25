@@ -53,6 +53,8 @@ Tests live in `packages/*/__test__/**/*.spec.ts` (vitest). Run from the package'
 - Server rolldown config inlines `__require("@babel/parser")` replacements and shims CJS globals (`__dirname`, `__filename`) for bundled MBLER chunks.
 - VS Code extension rolldown removes `.map` files and non-`index.*` dist files when copying server artifacts.
 - `@mbler/mcx-core` uses special `__require` references to `@babel/parser` — the `inlineBabelRequires()` plugin rewrites those to a local var.
+- `external: ['typescript']` only matches ESM specifiers, so `require('typescript')` inside a CJS dependency still gets inlined. The extension's `externalizeTypeScript()` plugin resolves it as an external by hand — without it, `@typescript-eslint/typescript-estree` (pulled in by the mcx ESLint plugin) drags the whole 8 MB compiler into the bundle.
+- The extension's `LINT_DEPENDENCIES` set (computed from `eslint` + `@typescript-eslint/parser` + the mcx plugin) is kept out of the eager `vendor` chunk; those ~3 MB load lazily on the first `.mcx` lint.
 
 ## Commit convention
 
@@ -68,4 +70,6 @@ Enforced by `scripts/verify-commit.mjs` via simple-git-hooks (pre-commit hook on
 - Launches via `.vscode/launch.json` with `--disable-extensions` and `--profile-temp`.
 - Activates on `onLanguage:mcx` or `workspaceContains:**/*.mcx`.
 - Registers completion, hover, definition, formatting providers in-proc, plus a language client to the MCX server.
+- `src/mcx-tags.ts` mirrors `@mbler/mcx-core`'s transform tables (`compile-mcx/types.ts`, `compileMCX.ts`, `transforms/transform/layout.ts`) and drives both attribute completion and the hover attribute list. Re-sync it when mcx-core adds a tag or attribute — it is the only place completions learn what a tag accepts.
+- `src/lint/index.ts` runs `@mbler/eslint-plugin-mcx` in-process (ESLint `Linter`, flat config) for open `.mcx` documents; `context.cwd` is the workspace folder so the plugin resolves the project's `@minecraft/server` typings. Settings: `mcx.lint.enable`, `mcx.lint.allowUnknownEvents`.
 - Watches saves of `.mcx/.ts/.js/.json` files and sends both `workspace/didChangeWatchedFiles` and `mcx/fileChanged` to the server.
