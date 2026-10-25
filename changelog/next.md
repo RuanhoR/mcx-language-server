@@ -1,5 +1,15 @@
 # Unreleased
 
+### 2026-10-25
+
+- **feat(vscode)**: `<Event>` block key completion — world event names extracted from the project's own `@minecraft/server` typings (same extraction as `@mbler/eslint-plugin-mcx`, bundled fallback lists), plus the `McxExtendsBy` directive; `.subscribe(` completion uses the same per-project lists
+- **feat(vscode)**: `<Event>` content formatting — `key = handler` lines normalized to single spaces around `=`, blank-line grouping preserved (collapsed to one)
+- **fix(vscode)**: accepting a tag completion after typing `<` no longer leaves a stray `>` when VS Code auto-inserts the closing bracket — the completion range consumes it
+- **refactor(vscode)**: `extension.ts` split into modules (`completion.ts`, `hover.ts`, `definition.ts`, `mcx-ast.ts`, `mcx-text.ts`, `mcx-events.ts`); the formatter reuses the shared AST helpers
+- **fix(server)**: a trailing incomplete expression in `<script>` (e.g. `luckBlock.`) no longer silently disappears — the generated virtual file now terminates the script content with a mapped `;`, so the TS service reports `Identifier expected.` on the broken statement instead of merging it with the generated tail sections (which previously parsed as a valid member access like `luckBlock.void(...)`)
+- **chore(server)**: Bump to 0.1.5-rc.5; `@mbler/mcx-core` dependency `1.1.5-dev.1` → `1.1.5-rc.4` (script error positions now map back to the .mcx file)
+- **chore(vscode)**: Bump to 1.1.7
+
 ### 2026-08-30
 
 - **feat(vscode)**: Welcome page (`MCX: Welcome`), auto-shown on install/update; startup activation with lazy language server start (`mcx.welcome.show` to disable)

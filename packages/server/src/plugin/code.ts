@@ -227,8 +227,22 @@ export class MCXVirtualCode implements VirtualCode {
       isTypeScript,
       compileData,
     )
+    // Terminate the script content before appending generated sections.
+    // Without this, a trailing incomplete expression like `luckBlock.` merges
+    // with the first tail token (e.g. `void (luckBlock);` parses as the valid
+    // member access `luckBlock.void(luckBlock)`), swallowing the syntax error.
+    // The terminator maps back to the last script character so the "Identifier
+    // expected." diagnostic lands on the broken statement in the .mcx file.
+    if (scriptContent.length > 0) {
+      mappings.push({
+        sourceOffsets: [scriptContentOffset + scriptContent.length - 1],
+        generatedOffsets: [scriptText.length + 1],
+        lengths: [1],
+        data: FULL_FEATURES,
+      })
+    }
     const generated =
-      scriptText + metadataSection + validationSection + runtimeSection
+      scriptText + '\n;' + metadataSection + validationSection + runtimeSection
 
     return new EmbeddedCode(
       'script',
