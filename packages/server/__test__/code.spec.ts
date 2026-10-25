@@ -183,7 +183,8 @@ describe('MCXVirtualCode', () => {
     const scriptCode = code.embeddedCodes.find(e => e.id === 'script')
     expect(scriptCode).toBeDefined()
     expect(scriptCode!.languageId).toBe('javascript')
-    expect(scriptCode!.mappings).toHaveLength(1)
+    // base mapping + the terminator `;` mapping that surfaces trailing syntax errors
+    expect(scriptCode!.mappings).toHaveLength(2)
   })
 
   it('should detect TypeScript script with lang attribute', async () => {
@@ -600,7 +601,8 @@ describe('EmbeddedCode (indirect via MCXVirtualCode)', () => {
     expect(scriptCode).toBeDefined()
     expect(scriptCode!.embeddedCodes).toEqual([])
     expect(scriptCode!.snapshot.getLength()).toBeGreaterThan(0)
-    expect(scriptCode!.mappings).toHaveLength(1)
+    // base mapping + the terminator `;` mapping that surfaces trailing syntax errors
+    expect(scriptCode!.mappings).toHaveLength(2)
   })
 
   it('should create raw embedded codes with disabled features', async () => {
