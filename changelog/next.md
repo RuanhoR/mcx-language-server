@@ -1,5 +1,11 @@
 # Unreleased
 
+### 2026-10-25 (2)
+
+- **fix(server)**: `<script>` imports of `.mcx` event files no longer leak the internal renamed binding (`__mcx_import_0`) into hovers/completions — the module import is now a **type-only** import with an internal name, and the user-facing binding comes from the mapped shadow declaration
+- **fix(server)**: the shadowed event binding is now really typed as `Event`, not `any` — `@mbler/mcx-types` is usually not resolvable from the `.mcx` file (pnpm nests it under `@mbler/mcx-core`), and an unresolvable `import()` type is an error type that cannot be detected inside the type system; the server now probes the package on disk (walking up from the `.mcx` file) and inlines the structural shape of the runtime `Event` class when it is not reachable
+- **chore(server)**: Bump to 0.1.5-rc.6
+
 ### 2026-10-25
 
 - **feat(vscode)**: `<Event>` block key completion — world event names extracted from the project's own `@minecraft/server` typings (same extraction as `@mbler/eslint-plugin-mcx`, bundled fallback lists), plus the `McxExtendsBy` directive; `.subscribe(` completion uses the same per-project lists

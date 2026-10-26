@@ -1,4 +1,6 @@
 import * as mcx from '@mbler/mcx-core'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import type {
   CodeMapping,
   IScriptSnapshot,
@@ -32,6 +34,39 @@ const DISABLED_FEATURES: NonNullable<CodeMapping['data']> = {
 }
 
 type MCXRuntimeType = 'app' | 'event' | 'ui' | 'component'
+
+/** Structural equivalent of the runtime `Event` class (see @mbler/mcx-types). */
+const EVENT_SHAPE_TYPE =
+  '{\n  subscribe(...events: string[]): boolean;\n  unsubscribe(...events: string[]): boolean;\n  useWorld(world: unknown): void;\n}'
+
+const mcxTypesSpecifierCache = new Map<string, string | null>()
+
+/**
+ * `@mbler/mcx-types` specifier usable from `sourcePath`, or null when the
+ * package cannot be reached from it. TS resolves modules from the importing
+ * file's location, so the pnpm-nested copy under @mbler/mcx-core does not
+ * count — only a node_modules on the directory chain does.
+ */
+function findMcxTypesSpecifier(sourcePath: string | undefined): string | null {
+  if (!sourcePath) return null
+  const cached = mcxTypesSpecifierCache.get(sourcePath)
+  if (cached !== undefined) return cached
+  let result: string | null = null
+  let dir = dirname(sourcePath)
+  for (let depth = 0; depth < 8; depth++) {
+    if (
+      existsSync(join(dir, 'node_modules', '@mbler', 'mcx-types', 'package.json'))
+    ) {
+      result = '@mbler/mcx-types'
+      break
+    }
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  mcxTypesSpecifierCache.set(sourcePath, result)
+  return result
+}
 
 class StringSnapshot implements IScriptSnapshot {
   constructor(private readonly text: string) {}
@@ -75,9 +110,12 @@ export class MCXVirtualCode implements VirtualCode {
   public snapshot: IScriptSnapshot
   public mappings: CodeMapping[] = []
   public embeddedCodes: VirtualCode[] = []
+  /** File path of the .mcx source, when the host provides one. */
+  public sourcePath: string | undefined
 
-  constructor(snapshot: IScriptSnapshot) {
+  constructor(snapshot: IScriptSnapshot, sourcePath?: string) {
     this.snapshot = snapshot
+    this.sourcePath = sourcePath
     this.rebuild()
   }
 
@@ -319,12 +357,22 @@ export class MCXVirtualCode implements VirtualCode {
       return { scriptText: scriptContent, mappings: defaultMappings }
     }
 
+    // The Event type lives in @mbler/mcx-types, which is not always
+    // resolvable from the .mcx file (pnpm nests it under @mbler/mcx-core).
+    // An unresolvable import() type is an error type that behaves like `any`
+    // and cannot be detected inside the type system, so resolve it on the
+    // server instead: use the real class when the package is reachable from
+    // the .mcx file, otherwise inline the structural shape of the runtime
+    // Event class — the bound event is typed either way, never `any`.
+    const mcxTypesSpecifier = findMcxTypesSpecifier(this.sourcePath)
+    const eventType = (): string =>
+      mcxTypesSpecifier
+        ? `import("${mcxTypesSpecifier}").Event`
+        : EVENT_SHAPE_TYPE
     const injectedTypes = new Map(
       eventImports.map(imp => [
         imp.as,
-        imp.type === 'all'
-          ? `{ default: import("@mbler/mcx-types").Event }`
-          : `import("@mbler/mcx-types").Event`,
+        imp.type === 'all' ? `{ default: ${eventType()} }` : eventType(),
       ]),
     )
 
@@ -362,18 +410,21 @@ export class MCXVirtualCode implements VirtualCode {
 
       const stmt = match[0]
       const start = match.index
+      const isAll = match[2] !== undefined
       // The binding is the last token before ` from `; match its prefix
-      // (`import ` / `import * as `) so the generated import keeps the exact
-      // same leading text and stays mapped 1:1.
+      // (`import ` / `import * as `) so the tail after the binding can be
+      // reused verbatim.
       const bindMatch = /^(?:import\s+)(?:\*\s*as\s+)?([\w$]+)/.exec(stmt)
       const bindRel = bindMatch ? bindMatch[0].length - bindMatch[1]!.length : 7
 
-      // 1) prefix — identical text in source and generated import
-      pushMappedSegment(start + bindRel - srcPos)
-      // 2) renamed internal binding — keeps the module import alive for
-      //    hover/navigation but must not surface its name; skip the source
-      //    binding without mapping it
-      pushUnmapped(`__mcx_import_${shadowed}`)
+      // 1) `import` keyword — identical text in source and generated import
+      pushMappedSegment(start + 'import'.length - srcPos)
+      // 2) `type [* as] __mcx_event_module_N` — the internal import becomes
+      //    type-only: it keeps the module specifier alive for hover/navigation
+      //    but declares no value binding, so the internal name can never leak
+      //    into value completions and no source position maps onto it. The
+      //    user-facing binding is the shadowing declaration below.
+      pushUnmapped(` type ${isAll ? '* as ' : ''}__mcx_event_module_${shadowed}`)
       srcPos = start + bindRel + bindingName.length
       // 3) ` from "<path>";` tail — identical text again
       pushMappedSegment(start + stmt.length - srcPos)

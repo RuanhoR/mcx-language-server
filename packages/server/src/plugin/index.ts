@@ -120,7 +120,10 @@ export function createMCXLanguagePlugin(
       snapshot: IScriptSnapshot,
     ): VirtualCode | undefined {
       if (languageId === 'mcx') {
-        return new MCXVirtualCode(snapshot)
+        // The file path lets the virtual code resolve project-relative
+        // resources (e.g. whether @mbler/mcx-types is reachable for Event
+        // typing).
+        return new MCXVirtualCode(snapshot, thisId(scriptId))
       }
       if (languageId === 'mcx-image') {
         return createImageVirtualCode(thisId(scriptId), snapshot)

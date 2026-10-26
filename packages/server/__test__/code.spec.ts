@@ -467,10 +467,12 @@ describe('MCXVirtualCode', () => {
     const text = scriptCode!.snapshot.getText(0, scriptCode!.snapshot.getLength())
     // The build injects Event instances in app context: the import binding is
     // shadowed with an Event type instead of the imported MCXFile<"event">,
-    // while the import statement itself stays (renamed) so hovering it still
-    // resolves to the event module
-    expect(text).toContain('declare const event: import("@mbler/mcx-types").Event;')
-    expect(text).toContain('import __mcx_import_0 from "./Event.mcx";')
+    // while the import statement itself stays (as a type-only import with an
+    // internal binding) so hovering it still resolves to the event module.
+    // Without a source path the server cannot confirm @mbler/mcx-types is
+    // reachable, so the structural Event shape is used.
+    expect(text).toMatch(/declare const event: \{\n {2}subscribe\(\.\.\.events: string\[\]\): boolean;/)
+    expect(text).toContain('import type __mcx_event_module_0 from "./Event.mcx";')
     expect(text).not.toContain('import event from')
     // the renamed binding and the injected declaration are unmapped generated
     // text; every source char stays mapped (the binding via its own mapping)
