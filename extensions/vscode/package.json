@@ -98,7 +98,7 @@
   },
   "devDependencies": {
     "@mbler/eslint-plugin-mcx": "0.0.1-rc.1",
-    "@mbler/mcx-core": "1.1.5-rc.4",
+    "@mbler/mcx-core": "1.1.5-rc.5",
     "@mbler/mcx-server": "workspace:*",
     "@mbler/mcx-ts-plugin": "workspace:*",
     "@types/vscode": "^1.115.0",
