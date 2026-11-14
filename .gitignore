@@ -3,3 +3,5 @@ out
 node_modules
 *.vsix
 coverage
+# compiler/test scratch files
+_tmp*

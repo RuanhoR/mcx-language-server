@@ -10,9 +10,8 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { createMCXLanguagePlugin } from "./plugin/index.js";
 import {
-  MCX_COMPLETION_MANIFEST,
+  collectWorkspaceContributions,
   createMcxCompletionRegistry,
-  readCompletionManifest,
   type McxCompletionContribution,
 } from "./completion/index.js";
 
@@ -51,30 +50,31 @@ function uriToPath(uri: string): string | undefined {
 }
 
 /**
- * Compiler plugins describe their tags in `.mbler/mcx-completion.json`
- * (written by mbler). Read it from every workspace folder so `<Ui type="jsonui">`
- * and other plugin tags complete like the built-in DSL.
+ * Compiler plugins describe their tags in `.mbler/mcx-completion.json`. mbler
+ * writes that file during a build; when no build has run yet the contributions
+ * are derived from each project's `mbler.config.*` and written back with `fs`,
+ * so plugin tags complete in the editor without a build. Every workspace folder
+ * is scanned because a workspace folder is not necessarily the project root.
  */
-function readCompletionContributions(): McxCompletionContribution[] {
-  const contributions: McxCompletionContribution[] = [];
+async function readCompletionContributions(): Promise<McxCompletionContribution[]> {
+  const byName = new Map<string, McxCompletionContribution>();
   for (const root of workspaceRoots) {
-    const manifest = readCompletionManifest(
-      path.join(root, MCX_COMPLETION_MANIFEST),
-      file => {
-        try {
-          return fs.readFileSync(file, "utf-8");
-        } catch {
-          return undefined;
+    try {
+      const synced = await collectWorkspaceContributions(root);
+      for (const project of synced) {
+        for (const contribution of project.contributions) {
+          if (!byName.has(contribution.name)) byName.set(contribution.name, contribution);
         }
-      },
-    );
-    if (manifest) contributions.push(...manifest.contributions);
+      }
+    } catch {
+      // a broken project in one folder must not hide the others
+    }
   }
-  return contributions;
+  return [...byName.values()];
 }
 
-function reloadCompletionData(): void {
-  completionContributions = readCompletionContributions();
+async function reloadCompletionData(): Promise<void> {
+  completionContributions = await readCompletionContributions();
 }
 
 let project: ReturnType<typeof createTypeScriptProject>;
@@ -149,7 +149,7 @@ function patchFileSystemForDirtyUris(): void {
   };
 }
 
-connection.onInitialize((params) => {
+connection.onInitialize(async (params) => {
   const typescriptServices = createTypeScriptServices(ts);
 
   workspaceRoots = (params.workspaceFolders ?? [])
@@ -160,7 +160,7 @@ connection.onInitialize((params) => {
     const root = uriToPath(rootUri);
     if (root) workspaceRoots = [root];
   }
-  reloadCompletionData();
+  await reloadCompletionData();
   if (completionContributions.length > 0) {
     // Rebuild the language plugin once, now that the workspace manifest is known.
     mcxLanguagePlugin.completion = createMcxCompletionRegistry(
@@ -233,7 +233,7 @@ connection.onInitialize((params) => {
   // plugins show up without restarting the server.
   connection.onRequest(
     "mcx/completionData",
-    (request?: { refresh?: boolean; workspaceFolders?: string[] }) => {
+    async (request?: { refresh?: boolean; workspaceFolders?: string[] }) => {
       if (Array.isArray(request?.workspaceFolders)) {
         const roots = request.workspaceFolders
           .map(uriToPath)
@@ -241,7 +241,7 @@ connection.onInitialize((params) => {
         if (roots.length > 0) workspaceRoots = roots;
       }
       if (request?.refresh !== false) {
-        reloadCompletionData();
+        await reloadCompletionData();
         mcxLanguagePlugin.completion = createMcxCompletionRegistry(
           ...completionContributions,
         );

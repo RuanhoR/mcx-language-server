@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
 // The client passes the TypeScript SDK location (mirrors Volar's --tsdk).
 // Must run before the server bundle loads, so this file stays
 // requirement-based instead of using static imports.
