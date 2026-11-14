@@ -13,6 +13,11 @@ import {
 } from 'vscode'
 import type { LanguageClient } from 'vscode-languageclient/node.js'
 import { createMCXLanguageClient, registerUnsavedContentSync } from './client/index.js'
+import {
+  MCX_COMPLETION_MANIFEST,
+  loadPluginCompletionData,
+  setCompletionClient,
+} from './completion-data.js'
 import { formatMCXDocument } from './format/index.js'
 import { provideMCXCompletions } from './completion.js'
 import { provideMCXHover } from './hover.js'
@@ -41,6 +46,7 @@ async function ensureClientStarted(context: ExtensionContext): Promise<void> {
   clientStarted = true
 
   client = createMCXLanguageClient(context);
+  setCompletionClient(client);
   client.start().then(() => {
     registerUnsavedContentSync(client!, context.subscriptions);
   }).catch((e: Error) => {
@@ -94,6 +100,19 @@ export function activate(context: ExtensionContext): void {
       return provideMCXCompletions(document, position)
     },
   }
+
+  // Compiler plugins advertise their tags through this manifest; refresh the
+  // completion cache whenever mbler rewrites it.
+  const completionManifestWatcher = workspace.createFileSystemWatcher(
+    `**/${MCX_COMPLETION_MANIFEST}`,
+  )
+  const refreshCompletion = () => {
+    void loadPluginCompletionData(true)
+  }
+  completionManifestWatcher.onDidCreate(refreshCompletion)
+  completionManifestWatcher.onDidChange(refreshCompletion)
+  completionManifestWatcher.onDidDelete(refreshCompletion)
+  context.subscriptions.push(completionManifestWatcher)
 
   context.subscriptions.push(
     languages.registerCompletionItemProvider(
@@ -202,6 +221,7 @@ async function restartLanguageServer(context: ExtensionContext): Promise<void> {
   clientStarted = true
 
   client = createMCXLanguageClient(context)
+  setCompletionClient(client)
   try {
     await client.start()
     registerUnsavedContentSync(client, context.subscriptions)

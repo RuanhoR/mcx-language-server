@@ -4,7 +4,10 @@ import { dts } from 'rolldown-plugin-dts'
 import { rm } from 'node:fs/promises'
 export default defineConfig([
   {
-    input: './src/index.ts',
+    input: {
+      index: './src/index.ts',
+      'completion/index': './src/completion/index.ts',
+    },
     output: {
       dir: './dist',
       format: 'esm',

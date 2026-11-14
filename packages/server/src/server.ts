@@ -4,8 +4,17 @@ import { provider as nodeFileSystemProvider } from "@volar/language-server/lib/f
 import { createTypeScriptProject } from "@volar/language-server/lib/project/typescriptProject.js";
 import { create as createTypeScriptServices } from "volar-service-typescript";
 import * as lsp from "vscode-languageserver/node.js";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { createMCXLanguagePlugin } from "./plugin/index.js";
+import {
+  MCX_COMPLETION_MANIFEST,
+  createMcxCompletionRegistry,
+  readCompletionManifest,
+  type McxCompletionContribution,
+} from "./completion/index.js";
 
 const connection = lsp.createConnection(lsp.ProposedFeatures.all);
 const immediate = (globalThis as unknown as { setImmediate?: (...args: unknown[]) => void }).setImmediate;
@@ -23,6 +32,50 @@ const server = createServerBase(connection, {
 });
 
 const mcxLanguagePlugin = createMCXLanguagePlugin(ts);
+
+// Plugin contributions currently in effect, re-read from disk on demand.
+let completionContributions: McxCompletionContribution[] = [];
+
+// Workspace roots of the current project, captured at initialize so the
+// completion manifest can be re-read when plugins change during a session.
+let workspaceRoots: string[] = [];
+
+/** Convert a `file://` URI into a usable path, ignoring non-file URIs. */
+function uriToPath(uri: string): string | undefined {
+  if (!uri.startsWith("file://")) return undefined;
+  try {
+    return fileURLToPath(uri);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Compiler plugins describe their tags in `.mbler/mcx-completion.json`
+ * (written by mbler). Read it from every workspace folder so `<Ui type="jsonui">`
+ * and other plugin tags complete like the built-in DSL.
+ */
+function readCompletionContributions(): McxCompletionContribution[] {
+  const contributions: McxCompletionContribution[] = [];
+  for (const root of workspaceRoots) {
+    const manifest = readCompletionManifest(
+      path.join(root, MCX_COMPLETION_MANIFEST),
+      file => {
+        try {
+          return fs.readFileSync(file, "utf-8");
+        } catch {
+          return undefined;
+        }
+      },
+    );
+    if (manifest) contributions.push(...manifest.contributions);
+  }
+  return contributions;
+}
+
+function reloadCompletionData(): void {
+  completionContributions = readCompletionContributions();
+}
 
 let project: ReturnType<typeof createTypeScriptProject>;
 
@@ -99,6 +152,22 @@ function patchFileSystemForDirtyUris(): void {
 connection.onInitialize((params) => {
   const typescriptServices = createTypeScriptServices(ts);
 
+  workspaceRoots = (params.workspaceFolders ?? [])
+    .map(folder => uriToPath(folder.uri))
+    .filter((root): root is string => typeof root === "string");
+  const rootUri = params.rootUri;
+  if (workspaceRoots.length === 0 && typeof rootUri === "string") {
+    const root = uriToPath(rootUri);
+    if (root) workspaceRoots = [root];
+  }
+  reloadCompletionData();
+  if (completionContributions.length > 0) {
+    // Rebuild the language plugin once, now that the workspace manifest is known.
+    mcxLanguagePlugin.completion = createMcxCompletionRegistry(
+      ...completionContributions,
+    );
+  }
+
   const extraFileExtensionsList: Array<{ extension: string; isMixedContent: boolean; scriptKind: number }> = [];
   if (mcxLanguagePlugin.typescript?.extraFileExtensions) {
     extraFileExtensionsList.push(...mcxLanguagePlugin.typescript.extraFileExtensions);
@@ -159,6 +228,35 @@ connection.onInitialize((params) => {
 
   // Unsaved ts/js/json content pushed by the extension on every edit; the
   // overrides win over disk reads until the file is saved or closed.
+  // Completion data for editor-side completion providers. The client passes
+  // `refresh: true` after `.mbler/mcx-completion.json` changes so newly added
+  // plugins show up without restarting the server.
+  connection.onRequest(
+    "mcx/completionData",
+    (request?: { refresh?: boolean; workspaceFolders?: string[] }) => {
+      if (Array.isArray(request?.workspaceFolders)) {
+        const roots = request.workspaceFolders
+          .map(uriToPath)
+          .filter((root): root is string => typeof root === "string");
+        if (roots.length > 0) workspaceRoots = roots;
+      }
+      if (request?.refresh !== false) {
+        reloadCompletionData();
+        mcxLanguagePlugin.completion = createMcxCompletionRegistry(
+          ...completionContributions,
+        );
+      }
+      const registry = mcxLanguagePlugin.completion;
+      return {
+        rootTags: registry.rootTags(),
+        scriptLangs: registry.scriptLangs(),
+        tags: registry.tags(),
+        containers: [...registry.containerTags()],
+        contributions: registry.contributions().map(item => item.name),
+      };
+    },
+  );
+
   connection.onNotification("mcx/fileContent", (change: { uri: string; text?: string | null }) => {
     const key = normalizeUriKey(change.uri);
     if (typeof change.text === "string") {

@@ -116,11 +116,12 @@ export function getOpenTagStack(source: string): string[] {
 export function getParentTagContext(
   document: TextDocument,
   position: Position,
+  containers: Set<string> = CONTAINER_TAGS,
 ): string | undefined {
   const entries = getOpenTagEntries(document, document.offsetAt(position))
   for (let i = entries.length - 1; i >= 0; i--) {
     const name = entries[i]!.name
-    if (CONTAINER_TAGS.has(name)) return name
+    if (containers.has(name)) return name
   }
   return undefined
 }

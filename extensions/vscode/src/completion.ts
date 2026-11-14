@@ -22,14 +22,18 @@ import {
   matchesTypedToken,
 } from './mcx-text.js'
 import {
-  ATTR_INFO,
   ROOT_TAGS,
-  SUGGESTED_ROOT_TAGS,
-  TAG_ATTRIBUTES,
   acceptsChild,
-  attributeInsertText,
-  getChildTags,
 } from './mcx-tags.js'
+import {
+  attributeValues,
+  loadPluginCompletionData,
+  mergedAttributes,
+  mergedChildTags,
+  mergedContainerTags,
+  mergedRootTags,
+  type PluginCompletionData,
+} from './completion-data.js'
 import {
   MCX_EVENT_DIRECTIVES,
   resolveWorldEventLists,
@@ -76,10 +80,16 @@ export async function provideMCXCompletions(
   }
 
   if (/<[A-Za-z:_-]*$/.test(linePrefix)) {
-    const parentContext = getParentTagContext(document, position)
+    // Plugin-contributed tags come from `.mbler/mcx-completion.json`.
+    const data = await loadPluginCompletionData()
+    const parentContext = getParentTagContext(
+      document,
+      position,
+      mergedContainerTags(data),
+    )
     const suggestions = parentContext
-      ? getChildTags(parentContext)
-      : SUGGESTED_ROOT_TAGS
+      ? mergedChildTags(parentContext, data)
+      : mergedRootTags(data)
     // The trigger char '<' is already in the buffer when this branch matches;
     // inserting `name>$0</name>` right after it yields `<name></name>`.
     // VS Code auto-inserts the matching `>` for `<`, so the cursor usually sits
@@ -114,27 +124,55 @@ export async function provideMCXCompletions(
     return []
   }
 
+  const tagName = currentTagName(linePrefix)
+  if (!tagName) return []
+
+  const data = await loadPluginCompletionData()
+  const typed = getPartialToken(linePrefix)
+  const range = getPartialTokenRange(linePrefix, position)
+
+  // Attribute value: `type="` offers the values the tag declares, so plugin
+  // enums (`type="jsonui"`, `availability="hud"`) complete like built-ins.
+  const valueContext = matchAttributeValue(linePrefix)
+  if (valueContext) {
+    const declared = attributeValues(tagName, valueContext.attribute, data)
+    const values =
+      declared.length > 0
+        ? declared
+        : valueContext.attribute === 'lang'
+          ? SCRIPT_LANG_VALUES
+          : []
+    const attribute = mergedAttributes(tagName, data).find(
+      item => item.name === valueContext.attribute,
+    )
+    return values
+      .filter(value => matchesTypedToken(value, valueContext.prefix))
+      .map(value => {
+        const item = new CompletionItem(value, CompletionItemKind.EnumMember)
+        item.range = range
+        item.insertText = value
+        item.detail = attribute?.detail ?? `${tagName} ${valueContext.attribute}`
+        return item
+      })
+  }
+
   if (isCompletingScriptLang(linePrefix)) {
-    const typed = getPartialToken(linePrefix)
     return SCRIPT_LANG_VALUES.filter(lang =>
       matchesTypedToken(lang, typed),
     ).map(lang => {
       const item = new CompletionItem(lang, CompletionItemKind.EnumMember)
-      item.range = getPartialTokenRange(linePrefix, position)
+      item.range = range
       item.insertText = lang
       item.detail = 'script lang'
       return item
     })
   }
 
-  const tagName = currentTagName(linePrefix)
-  if (!tagName) return []
-
   const containers = getOpenTagEntries(
     document,
     document.offsetAt(position),
   ).map(entry => entry.name)
-  return getAttributeCompletions(tagName, linePrefix, position, containers)
+  return getAttributeCompletions(tagName, linePrefix, position, containers, data)
 }
 
 function isInsideRange(
@@ -292,37 +330,58 @@ function attributeKind(name: string): CompletionItemKind {
 }
 
 /** True when `tagName` is valid at the cursor, given the enclosing tag chain. */
-function isValidPlacement(containers: string[], tagName: string): boolean {
-  if (containers.length === 0) return ROOT_TAGS.includes(tagName)
-  return containers.some(parent => acceptsChild(parent, tagName))
+function isValidPlacement(
+  containers: string[],
+  tagName: string,
+  data: PluginCompletionData,
+): boolean {
+  if (containers.length === 0) {
+    return mergedRootTags(data).includes(tagName) || ROOT_TAGS.includes(tagName)
+  }
+  return containers.some(
+    parent =>
+      acceptsChild(parent, tagName) ||
+      mergedChildTags(parent, data).includes(tagName),
+  )
+}
+
+/** `attr="` prefix the cursor sits in, when completing an attribute value. */
+function matchAttributeValue(
+  linePrefix: string,
+): { attribute: string; prefix: string } | undefined {
+  const match = linePrefix.match(/([A-Za-z_][\w@:.-]*)=["']([^"']*)$/)
+  if (!match) return undefined
+  return { attribute: match[1]!, prefix: match[2] ?? '' }
 }
 
 /**
  * Attributes accepted by `tagName` at the cursor, taken from the compiler's own
- * tables (`./mcx-tags.ts`) — a tag in the wrong place gets nothing rather than
- * a generic list.
+ * tables (`./mcx-tags.ts`) plus whatever compiler plugins contributed — a tag
+ * in the wrong place gets nothing rather than a generic list.
  */
 function getAttributeCompletions(
   tagName: string,
   linePrefix: string,
   position: Position,
   containers: string[],
+  data: PluginCompletionData,
 ): CompletionItem[] {
-  if (!isValidPlacement(containers, tagName)) return []
-  const allowed = TAG_ATTRIBUTES[tagName]
-  if (!allowed || allowed.length === 0) return []
+  if (!isValidPlacement(containers, tagName, data)) return []
+  const allowed = mergedAttributes(tagName, data)
+  if (allowed.length === 0) return []
 
   const typed = getPartialToken(linePrefix)
   const range = getPartialTokenRange(linePrefix, position)
   const used = getUsedAttributes(linePrefix)
   const items: CompletionItem[] = []
-  for (const name of allowed) {
-    if (used.has(name) || !matchesTypedToken(name, typed)) continue
-    const item = new CompletionItem(name, attributeKind(name))
+  for (const attribute of allowed) {
+    if (used.has(attribute.name)) continue
+    if (!matchesTypedToken(attribute.name, typed)) continue
+    const item = new CompletionItem(attribute.name, attributeKind(attribute.name))
     item.range = range
-    item.filterText = name
-    item.insertText = attributeInsertText(name)
-    item.detail = ATTR_INFO[name]?.summary ?? 'MCX attribute'
+    item.filterText = attribute.name
+    item.insertText = attribute.insertText ?? attribute.name
+    item.detail = attribute.detail ?? 'MCX attribute'
     items.push(item)
   }
   return items

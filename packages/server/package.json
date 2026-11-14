@@ -1,6 +1,6 @@
 {
   "name": "@mbler/mcx-server",
-  "version": "0.1.5-rc.6",
+  "version": "0.1.6-rc.2",
   "description": "MCX Language Server",
   "engines": {
     "node": ">=20"
@@ -32,6 +32,11 @@
     "./server": {
       "import": "./dist/server.js",
       "require": "./dist/server.js"
+    },
+    "./completion": {
+      "import": "./dist/completion/index.js",
+      "types": "./dist/completion/index.d.ts",
+      "require": "./dist/completion/index.js"
     }
   },
   "scripts": {

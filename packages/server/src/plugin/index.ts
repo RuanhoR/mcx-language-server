@@ -6,6 +6,11 @@ import type {
 } from '@volar/language-core'
 import type * as ts from 'typescript'
 import { MCXVirtualCode } from './code.js'
+import {
+  createMcxCompletionRegistry,
+  type McxCompletionContribution,
+  type McxCompletionRegistry,
+} from '../completion/index.js'
 
 interface TypeScriptServiceScript {
   code: VirtualCode
@@ -41,6 +46,17 @@ const IMAGE_EXTENSION_MAP: Record<string, ImageComponentType> = {
 
 export interface MCXLanguagePlugin extends LanguagePlugin<unknown, VirtualCode> {
   typescript: TypeScriptLanguageSupport
+  /**
+   * Tag/attribute completion data. Starts with the built-in MCX DSL and grows
+   * with whatever compiler plugins contributed through
+   * `.mbler/mcx-completion.json`.
+   */
+  completion: McxCompletionRegistry
+}
+
+export interface MCXLanguagePluginOptions {
+  /** Contributions merged on top of the built-in MCX DSL data. */
+  completions?: McxCompletionContribution[]
 }
 
 function createImageVirtualCode(
@@ -101,8 +117,10 @@ function createImageVirtualCode(
  */
 export function createMCXLanguagePlugin(
   tsModule: typeof import('typescript'),
+  options: MCXLanguagePluginOptions = {},
 ): MCXLanguagePlugin {
   return {
+    completion: createMcxCompletionRegistry(...(options.completions ?? [])),
     getLanguageId(scriptId: unknown): string | undefined {
       const id = thisId(scriptId)
       if (id.endsWith('.mcx')) {

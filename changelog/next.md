@@ -1,5 +1,14 @@
 # Unreleased
 
+### 2026-11-14
+
+- **feat(server)**: compiler-plugin completion data — new portable `src/completion/` layer (`types` / `builtin` / `registry` / `manifest`) that stores the MCX DSL tables, merges plugin contributions (root tags, tags, `extends` attribute sets, `scriptLangs`) and reads `.mbler/mcx-completion.json`; `createMCXLanguagePlugin` takes `options.completions`, and the server answers a new `mcx/completionData` request (re-reading the manifest on `refresh: true`, workspace folders from `initialize` or the request)
+- **feat(vscode)**: completion now comes from the server, so `mcxPlugin` contributions show up — new `completion-data.ts` caches the `mcx/completionData` answer and layers it over `mcx-tags.ts` (root tags, child tags, container lookup, attribute lists, attribute `values`); a `**/.mbler/mcx-completion.json` watcher refreshes it. `type="jsonui"`, `availability` enums and `<JsonUi>` complete out of the box
+- **feat(vscode)**: attribute-value completion inside `attr="` — enum values declared by a tag (built-in or contributed) are offered, with the documented detail text
+- **feat(server)**: `@mbler/mcx-server/completion` subpath export (built as a second rolldown entry) so other consumers can reuse the registry without the LSP
+- **test(server)**: `completion.spec.ts` covers builtin data, contribution merging, `extends` resolution, manifest parsing and the request payload shape
+- **chore(release)**: bump `@mbler/mcx-server` 0.1.6-rc.1, `@mbler/mcx-ts-plugin` 0.1.3-rc.1
+
 ### 2026-10-25 (2)
 
 - **fix(server)**: `<script>` imports of `.mcx` event files no longer leak the internal renamed binding (`__mcx_import_0`) into hovers/completions — the module import is now a **type-only** import with an internal name, and the user-facing binding comes from the mapped shadow declaration

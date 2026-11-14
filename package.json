@@ -6,7 +6,6 @@
   "engines": {
     "node": ">=22.13"
   },
-  "main": "index.js",
   "scripts": {
     "prepare": "simple-git-hooks",
     "lint:packages": "eslint . --ext .js,.ts",
