@@ -1,3 +1,10 @@
+import {
+  _MCXstructureLocComponentTypes,
+  COMMON_ATTRS,
+  FORM_TAGS as CORE_FORM_TAGS,
+  TAG_ATTRS,
+  UI_TAGS as CORE_UI_TAGS,
+} from '@mbler/mcx-core';
 import type {
   McxAttributeCompletion,
   McxCompletionContribution,
@@ -13,66 +20,23 @@ export const MCX_ROOT_TAGS = [
   'Form',
 ] as const;
 
-/** Containers accepted inside `<Component>`. */
-export const COMPONENT_CONTAINERS = [
-  'items',
-  'blocks',
-  'entities',
-  'features',
-  'featureRules',
-  'spawnRules',
-  'recipes',
-  'loot_tables',
-  'trade_tables',
-  'itemCatalog',
-] as const;
+/** Containers accepted inside `<Component>` — the compiler's component map. */
+export const COMPONENT_CONTAINERS = Object.keys(
+  _MCXstructureLocComponentTypes,
+);
 
 /** Child tag declared by each `<Component>` container. */
 export const COMPONENT_CONTAINER_CHILD: Record<string, string> = {
-  items: 'item',
-  blocks: 'block',
-  entities: 'entity',
-  features: 'feature',
-  featureRules: 'featureRule',
-  spawnRules: 'spawnRule',
-  recipes: 'recipe',
-  loot_tables: 'lootTable',
-  trade_tables: 'tradeTable',
-  itemCatalog: 'itemCatalog',
+  ..._MCXstructureLocComponentTypes,
 };
 
 export const COMPONENT_LEAF_TAGS = Object.values(COMPONENT_CONTAINER_CHILD);
 
 /** Leaf controls of a reactive `<Ui>` layout. */
-export const UI_LAYOUT_TYPES = [
-  'input',
-  'textField',
-  'toggle',
-  'dropdown',
-  'slider',
-  'button',
-  'label',
-  'body',
-  'header',
-  'title',
-  'divider',
-  'spacer',
-  'close-button',
-] as const;
+export const UI_LAYOUT_TYPES = [...CORE_UI_TAGS];
 
 /** Leaf controls of a legacy `<Form>` layout. */
-export const FORM_LAYOUT_TYPES = [
-  'input',
-  'dropdown',
-  'submit',
-  'toggle',
-  'slider',
-  'button',
-  'button-m',
-  'body',
-  'divider',
-  'title',
-] as const;
+export const FORM_LAYOUT_TYPES = [...CORE_FORM_TAGS];
 
 const SCRIPT_LANGS = ['ts', 'js'];
 
@@ -82,72 +46,55 @@ const attr = (
   extra?: Partial<McxAttributeCompletion>,
 ): McxAttributeCompletion => ({ name, detail, ...extra });
 
-/** Attributes valid on every UI control. */
-const UI_CONTROL_ATTRIBUTES: McxAttributeCompletion[] = [
-  attr('tip', 'Tooltip text'),
-  attr(':tip', 'Dynamic tooltip expression'),
-  attr('disabled', 'Disabled state'),
-  attr(':disabled', 'Dynamic disabled expression'),
-  attr('visible', 'Visibility'),
-  attr(':visible', 'Dynamic visibility expression'),
-  attr('description', 'Description text'),
-  attr(':description', 'Dynamic description expression'),
-  attr('for', 'For loop expression (e.g. "item in items")'),
-  attr('if', 'Conditional expression'),
-  attr(':if', 'Dynamic conditional expression'),
-];
-
-/** Extra attributes per control, on top of {@link UI_CONTROL_ATTRIBUTES}. */
-const CONTROL_EXTRAS: Record<string, McxAttributeCompletion[]> = {
-  input: [
-    attr('placeholderText', 'Input placeholder text'),
-    attr(':placeholderText', 'Dynamic placeholder text'),
-    attr('default', 'Default value'),
-    attr(':default', 'Dynamic default value'),
-    attr(':value', 'Dynamic value binding'),
-  ],
-  textField: [
-    attr('placeholderText', 'Input placeholder text'),
-    attr(':placeholderText', 'Dynamic placeholder text'),
-    attr('default', 'Default value'),
-    attr(':default', 'Dynamic default value'),
-    attr(':value', 'Dynamic value binding'),
-  ],
-  toggle: [
-    attr('default', 'Default state (true/false)'),
-    attr(':default', 'Dynamic default state'),
-    attr(':value', 'Dynamic value binding'),
-  ],
-  dropdown: [
-    attr('default', 'Default selection index'),
-    attr(':default', 'Dynamic default index'),
-    attr('option', 'Dropdown options (comma-separated or array)'),
-    attr(':option', 'Dynamic options'),
-    attr(':value', 'Dynamic value binding'),
-  ],
-  slider: [
-    attr('default', 'Default value'),
-    attr(':default', 'Dynamic default'),
-    attr('min', 'Minimum value'),
-    attr(':min', 'Dynamic minimum'),
-    attr('max', 'Maximum value'),
-    attr(':max', 'Dynamic maximum'),
-    attr(':value', 'Dynamic value binding'),
-  ],
-  button: [
-    attr('click', 'Click handler function name'),
-    attr(':click', 'Dynamic click handler'),
-    attr('img', 'Button image path'),
-  ],
-  submit: [
-    attr('click', 'Click handler function name'),
-    attr(':click', 'Dynamic click handler'),
-  ],
-  'button-m': [
-    attr('click', 'Click handler function name'),
-    attr(':click', 'Dynamic click handler'),
-  ],
+const ATTR_DETAILS: Record<string, string> = {
+  id: 'Element identifier',
+  ':id': 'Dynamic element identifier',
+  for: 'For loop expression (e.g. "item in items")',
+  ':for': 'Dynamic for expression',
+  if: 'Conditional expression',
+  ':if': 'Dynamic conditional expression',
+  tip: 'Tooltip text',
+  ':tip': 'Dynamic tooltip expression',
+  disabled: 'Disabled state',
+  ':disabled': 'Dynamic disabled expression',
+  visible: 'Visibility',
+  ':visible': 'Dynamic visibility expression',
+  description: 'Description text',
+  ':description': 'Dynamic description expression',
+  placeholderText: 'Input placeholder text',
+  ':placeholderText': 'Dynamic placeholder text',
+  default: 'Default value',
+  ':default': 'Dynamic default value',
+  value: 'Current value (two-way binding in Ui mode)',
+  ':value': 'Dynamic value binding',
+  option: 'Dropdown options (comma-separated or array)',
+  ':option': 'Dynamic options',
+  min: 'Minimum value',
+  ':min': 'Dynamic minimum',
+  max: 'Maximum value',
+  ':max': 'Dynamic maximum',
+  click: 'Click handler function name',
+  ':click': 'Dynamic click handler',
+  img: 'Button image path',
+  ':img': 'Dynamic button image',
 };
+
+const attrFor = (name: string): McxAttributeCompletion =>
+  attr(name, ATTR_DETAILS[name] ?? 'MCX attribute');
+
+/** Attributes valid on every UI control — the compiler's common set. */
+const UI_CONTROL_ATTRIBUTES: McxAttributeCompletion[] = [...COMMON_ATTRS].map(
+  attrFor,
+);
+
+/** Extra attributes per control, from the compiler's per-tag table. */
+const CONTROL_EXTRAS: Record<string, McxAttributeCompletion[]> =
+  Object.fromEntries(
+    Object.entries(TAG_ATTRS).map(([tag, attrs]) => [
+      tag,
+      [...attrs].map(attrFor),
+    ]),
+  );
 
 function controlTag(name: string, layout: string): McxTagCompletion {
   return {

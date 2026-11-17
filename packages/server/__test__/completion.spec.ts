@@ -1,3 +1,8 @@
+import {
+  _MCXstructureLocComponentTypes,
+  COMMON_ATTRS,
+  TAG_ATTRS,
+} from '@mbler/mcx-core'
 import { describe, expect, it } from 'vitest'
 import {
   createMcxCompletionRegistry,
@@ -43,6 +48,27 @@ describe('completion registry', () => {
     expect(registry.childrenOf('Component')).toContain('items')
     expect(registry.childrenOf('Ui')).toContain('toggle')
     expect(registry.tag('Ui')?.container).toBe(true)
+  })
+
+  it('derives the built-in tables from the compiler in @mbler/mcx-core', () => {
+    const registry = createMcxCompletionRegistry()
+    expect(registry.childrenOf('Component')).toEqual(
+      Object.keys(_MCXstructureLocComponentTypes),
+    )
+    expect(registry.childrenOf('Component')).toContain('spawn_rules')
+    expect(registry.childrenOf('Component')).toContain('feature_rules')
+    expect(registry.childrenOf('Component')).not.toContain('spawnRules')
+    expect(registry.childrenOf('Component')).not.toContain('featureRules')
+
+    const inputAttrs = new Set(registry.attributesOf('input').map(a => a.name))
+    for (const name of COMMON_ATTRS) expect(inputAttrs.has(name)).toBe(true)
+    for (const name of TAG_ATTRS['input'] ?? []) {
+      expect(inputAttrs.has(name)).toBe(true)
+    }
+    const buttonAttrs = new Set(
+      registry.attributesOf('button').map(a => a.name),
+    )
+    expect(buttonAttrs.has(':img')).toBe(true)
   })
 
   it('resolves shared attribute sets through extends', () => {

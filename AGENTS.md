@@ -70,6 +70,6 @@ Enforced by `scripts/verify-commit.mjs` via simple-git-hooks (pre-commit hook on
 - Launches via `.vscode/launch.json` with `--disable-extensions` and `--profile-temp`.
 - Activates on `onLanguage:mcx` or `workspaceContains:**/*.mcx`.
 - Registers completion, hover, definition, formatting providers in-proc, plus a language client to the MCX server.
-- `src/mcx-tags.ts` mirrors `@mbler/mcx-core`'s transform tables (`compile-mcx/types.ts`, `compileMCX.ts`, `transforms/transform/layout.ts`) and drives both attribute completion and the hover attribute list. Re-sync it when mcx-core adds a tag or attribute — it is the only place completions learn what a tag accepts.
+- `src/mcx-tags.ts` imports the compiler's authoritative tables (`_MCXstructureLocComponentTypes`, `UI_TAGS`, `FORM_TAGS`, `COMMON_ATTRS`, `TAG_ATTRS`) from `@mbler/mcx-core` and adds editor-only docs/insert text. It drives attribute completion and hover; new compiler tags/attributes require a mcx-core release, not a manual re-sync here.
 - `src/lint/index.ts` runs `@mbler/eslint-plugin-mcx` in-process (ESLint `Linter`, flat config) for open `.mcx` documents; `context.cwd` is the workspace folder so the plugin resolves the project's `@minecraft/server` typings. Settings: `mcx.lint.enable`, `mcx.lint.allowUnknownEvents`.
 - Watches saves of `.mcx/.ts/.js/.json` files and sends both `workspace/didChangeWatchedFiles` and `mcx/fileChanged` to the server.

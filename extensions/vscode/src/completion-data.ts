@@ -71,6 +71,7 @@ let pending: Promise<PluginCompletionData> | undefined
 export function setCompletionClient(next: LanguageClient | undefined): void {
   client = next
   cached = EMPTY
+  pending = undefined
 }
 
 /**
@@ -85,11 +86,13 @@ export async function loadPluginCompletionData(
   if (pending) return pending
 
   pending = (async () => {
+    const activeClient = client!
     try {
-      const raw = await client!.sendRequest<CompletionDataResponse>(
+      const raw = await activeClient.sendRequest<CompletionDataResponse>(
         'mcx/completionData',
         { refresh: force },
       )
+      if (client !== activeClient) return cached
       cached = {
         rootTags: [...(raw.rootTags ?? [])],
         scriptLangs: [...(raw.scriptLangs ?? [])],

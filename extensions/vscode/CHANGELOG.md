@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixes
+
+- Built-in completion tables now come straight from the compiler (`@mbler/mcx-core`) instead of a hand-mirrored copy — `<Component>` no longer suggests invalid `spawnRules` / `featureRules` and now offers `ui`, `client_entities`, `attachables`, plain `value`, `:img` and `id` / `:id` / `:for`
+- Hover docs cover every component group/leaf; restarting the server no longer leaves a stale completion cache
+
+## [1.1.8]
+
 ### Features
 
 - `<Event>` block key completion: world event names for the configured side (`@after` / `@before`), extracted from the project's own `@minecraft/server` typings with the same brace-balanced parser as `@mbler/eslint-plugin-mcx` (bundled fallback lists when the package is absent), plus the `McxExtendsBy` directive; `.subscribe(` completions use the same per-project lists

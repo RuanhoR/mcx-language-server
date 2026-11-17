@@ -1,20 +1,21 @@
 /**
  * Tag / attribute tables for the MCX DSL.
  *
- * Everything here is mirrored from `@mbler/mcx-core`, which is the only
- * authority on what a `.mcx` file actually accepts:
- *
- * - `compile-mcx/types.ts`               component group -> child tag map
- * - `compile-mcx/compiler/compileMCX.ts`  root tags, `id` on component children
- * - `transforms/transform/layout.ts`      `UI_TAGS` / `FORM_TAGS` / `COMMON_ATTRS` / `TAG_ATTRS`
- * - `transforms/main.ts`                  `setup` on `<Ui>` / `<Form>`
- * - `transforms/utils.ts`                 `tick` on `<Event>`
- *
- * The tables drive both attribute completions and hover docs, so they must not
- * drift from the compiler. Note the compiler validates almost nothing: an
- * unknown attribute on an unlisted tag is silently forwarded, which is exactly
- * why completion should offer the *known* set instead of everything.
+ * The compiler's authoritative tables — component groups and their output
+ * packs (`compile-mcx/types.ts`) plus UI/Form tags and layout attributes
+ * (`transforms/transform/layout.ts`) — are imported from `@mbler/mcx-core`.
+ * This module adds only editor-facing docs and insert text; do not duplicate
+ * compiler rules here, extend `@mbler/mcx-core` instead.
  */
+
+import {
+  _MCXComponentGroupOutputPack,
+  _MCXstructureLocComponentTypes,
+  COMMON_ATTRS,
+  FORM_TAGS as CORE_FORM_TAGS,
+  TAG_ATTRS,
+  UI_TAGS as CORE_UI_TAGS,
+} from '@mbler/mcx-core'
 
 /** Root tags recognised at the top level of a file. */
 export const ROOT_TAGS = ['script', 'Event', 'Ui', 'Form', 'Component', 'App']
@@ -24,88 +25,25 @@ export const SUGGESTED_ROOT_TAGS = ['script', 'Event', 'Ui', 'Form', 'Component'
 
 /** `<Component>` group tag -> the single child tag it accepts. */
 export const COMPONENT_GROUPS: Record<string, string> = {
-  items: 'item',
-  blocks: 'block',
-  entities: 'entity',
-  recipes: 'recipe',
-  loot_tables: 'lootTable',
-  spawn_rules: 'spawnRule',
-  trade_tables: 'tradeTable',
-  features: 'feature',
-  feature_rules: 'featureRule',
-  itemCatalog: 'itemCatalog',
-  ui: 'ui',
-  client_entities: 'clientEntity',
-  attachables: 'attachable',
+  ..._MCXstructureLocComponentTypes,
 }
 
 /** Groups whose files are written to the resource pack, not the behavior pack. */
-export const RESOURCE_PACK_GROUPS = [
-  'ui',
-  'client_entities',
-  'attachables',
-]
+export const RESOURCE_PACK_GROUPS = Object.keys(_MCXComponentGroupOutputPack)
 
 /** Leaf elements accepted inside `<Ui>`. */
-export const UI_TAGS = [
-  'input',
-  'textField',
-  'toggle',
-  'dropdown',
-  'slider',
-  'button',
-  'label',
-  'body',
-  'header',
-  'title',
-  'divider',
-  'spacer',
-  'close-button',
-]
+export const UI_TAGS = [...CORE_UI_TAGS]
 
 /** Leaf elements accepted inside `<Form>`. */
-export const FORM_TAGS = [
-  'input',
-  'dropdown',
-  'submit',
-  'toggle',
-  'slider',
-  'button',
-  'button-m',
-  'body',
-  'divider',
-  'title',
-]
+export const FORM_TAGS = [...CORE_FORM_TAGS]
 
 /** `COMMON_ATTRS` — accepted by every `<Ui>` / `<Form>` leaf. */
-const LAYOUT_COMMON_ATTRS = [
-  'id',
-  'for',
-  'if',
-  'tip',
-  'disabled',
-  'visible',
-  'description',
-  ':id',
-  ':for',
-  ':if',
-  ':tip',
-  ':disabled',
-  ':visible',
-  ':description',
-]
+const LAYOUT_COMMON_ATTRS = [...COMMON_ATTRS]
 
 /** `TAG_ATTRS` — per-element extras on top of `LAYOUT_COMMON_ATTRS`. */
-const LAYOUT_EXTRA_ATTRS: Record<string, string[]> = {
-  input: ['placeholderText', 'default', 'value', ':placeholderText', ':default', ':value'],
-  textField: ['placeholderText', 'default', 'value', ':placeholderText', ':default', ':value'],
-  toggle: ['default', 'value', ':default', ':value'],
-  dropdown: ['default', 'value', 'option', ':default', ':value', ':option'],
-  slider: ['default', 'value', 'min', 'max', ':default', ':value', ':min', ':max'],
-  button: ['click', 'img', ':click', ':img'],
-  submit: ['click', ':click'],
-  'button-m': ['click', ':click'],
-}
+const LAYOUT_EXTRA_ATTRS: Record<string, string[]> = Object.fromEntries(
+  Object.entries(TAG_ATTRS).map(([tag, attrs]) => [tag, [...attrs]]),
+)
 
 /** Tags that contain other tags (used for the "where am I" completion logic). */
 export const CONTAINER_TAGS = new Set([
@@ -126,6 +64,8 @@ const REQUIRED_ID_ONLY: Record<string, string[]> = {
   feature: ['id'],
   featureRule: ['id'],
   itemCatalog: ['id'],
+  clientEntity: ['id'],
+  attachable: ['id'],
 }
 
 const layoutTagAttributes = (): Record<string, string[]> => {
@@ -258,6 +198,9 @@ export const TAG_INFO: Record<string, string> = {
   loot_tables: 'Loot table definitions container inside `<Component>`.',
   trade_tables: 'Trade table definitions container inside `<Component>`.',
   itemCatalog: 'Item catalog container inside `<Component>`; also the name of its own child element.',
+  ui: 'UI definitions container inside `<Component>`; files are written to the resource pack.',
+  client_entities: 'Client entity definitions container inside `<Component>`; files are written to the resource pack.',
+  attachables: 'Attachable definitions container inside `<Component>`; files are written to the resource pack.',
   item: 'Custom item definition. Its content is the name of an exported script function.',
   block: 'Custom block definition. Its content is the name of an exported script function.',
   entity: 'Custom entity definition. Its content is the name of an exported script function.',
@@ -267,6 +210,8 @@ export const TAG_INFO: Record<string, string> = {
   recipe: 'Custom recipe definition.',
   lootTable: 'Custom loot table definition.',
   tradeTable: 'Custom trade table definition.',
+  clientEntity: 'Custom client entity definition.',
+  attachable: 'Custom attachable definition.',
   input: 'Text input field.',
   textField: 'Text input field.',
   toggle: 'Switch control.',

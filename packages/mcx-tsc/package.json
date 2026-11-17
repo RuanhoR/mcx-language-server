@@ -1,6 +1,6 @@
 {
   "name": "mcx-tsc",
-  "version": "0.0.2-rc.5",
+  "version": "0.0.2-rc.6",
   "description": "Type check for mcx",
   "main": "dist/index.js",
   "exports": {

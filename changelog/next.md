@@ -1,5 +1,12 @@
 # Unreleased
 
+### 2026-11-17
+
+- **fix(server)**: built-in completion tables (`Component` groups and children, UI/Form tags, common/per-control attributes) are now derived from the compiler's authoritative exports in `@mbler/mcx-core` instead of a stale hand-copied table — no more invalid `spawnRules` / `featureRules` suggestions, and `ui`, `client_entities`, `attachables`, plain `value`, `:img`, `id` / `:id` / `:for` are now offered
+- **test(server)**: `completion.spec.ts` asserts the built-in data equals the core tables so it cannot drift again
+- **fix(vscode)**: `mcx-tags.ts` imports the compiler tables from `@mbler/mcx-core` instead of mirroring them; hover docs gained the previously missing component groups/leaves; `setCompletionClient` no longer leaves a stale in-flight request
+- **chore(release)**: bump `@mbler/mcx-server` 0.1.6-rc.4, `mcx-vscode-client` 1.1.9, `mcx-tsc` 0.0.2-rc.6, `@mbler/mcx-ts-plugin` 0.1.3-rc.3; `@mbler/mcx-core` dependency → 1.1.5-rc.6, `@mbler/mcx-types` → ^0.0.4-rc.9
+
 ### 2026-11-14
 
 - **feat(server)**: plugin completions no longer require a build — every `mbler.config.*` under the workspace folder is scanned (workspace folders are not necessarily project roots), and when a project's `.mbler/mcx-completion.json` is missing or older than `mbler.config.*`, the server derives the contributions from the config itself (dynamic import with a cache-busting query so an edit is picked up without a restart, plugin factories called once, throwing factories skipped) and writes the manifest back with `fs`; the editor's existing manifest watcher then refreshes completion on its own. A broken config falls back to the last manifest, a non-`mcx` project contributes nothing, and a config with no plugins removes the stale file
